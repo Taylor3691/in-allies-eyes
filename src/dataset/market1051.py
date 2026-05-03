@@ -1,6 +1,6 @@
 from base import Object, config
 from pathlib import Path
-from utils import process_dir
+from utils import process_dir, get_metadata
 
 class Market1501(Object):
 
@@ -21,6 +21,10 @@ class Market1501(Object):
         self._query = process_dir(self.query_dir, relabel= False)
         self._gallery = process_dir(self.gallery_dir, relabel= False)
 
+        self.num_train_pids, self.num_train_imgs, self.num_train_cams = get_metadata(self._train)
+        self.num_query_pids, self.num_query_imgs, self.num_query_cams = get_metadata(self._query)
+        self.num_gallery_pids, self.num_gallery_imgs, self.num_gallery_cams = get_metadata(self._gallery)
+
         return 
     def save(self):
         return super().save()
@@ -28,7 +32,15 @@ class Market1501(Object):
     def clone():
         pass
 
-    def info():
+    def info(self):
+        print("Dataset statistics:")
+        print("  ----------------------------------------")
+        print("  subset   | # ids | # images | # cameras")
+        print("  ----------------------------------------")
+        print("  train    | {:5d} | {:8d} | {:9d}".format(self.num_train_pids, self.num_train_imgs, self.num_train_cams))
+        print("  query    | {:5d} | {:8d} | {:9d}".format(self.num_query_pids, self.num_query_imgs, self.num_query_cams))
+        print("  gallery  | {:5d} | {:8d} | {:9d}".format(self.num_gallery_pids, self.num_gallery_imgs, self.num_gallery_cams))
+        print("  ----------------------------------------")
         return
     
     def accept():

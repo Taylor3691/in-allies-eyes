@@ -19,8 +19,6 @@ def process_dir(dir_path: Path, relabel: bool):
             continue
         pid_set.add(pid)
 
-    print(len(pid_set))
-
     pid2label = {pid: i for i, pid in enumerate(sorted(pid_set))}
     
     for img_path in dir_path.glob("*.jpg"):
