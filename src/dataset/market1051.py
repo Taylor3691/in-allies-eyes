@@ -1,6 +1,6 @@
 from base import Object, config
 from pathlib import Path
-from utils import process_dir, get_metadata, print_split_samples
+from utils import process_dir, get_metadata, print_split_samples, batch_loader
 
 class Market1501(Object):
 
@@ -16,6 +16,16 @@ class Market1501(Object):
         self._query = []
 
         return
+    
+    def train_loader(self):
+        return batch_loader(paths=self._train, batch_size=config.BATCH_SIZE)
+    
+    def query_loader(self):
+        return batch_loader(paths=self._query, batch_size=config.BATCH_SIZE)
+    
+    def gallery_loader(self):
+        return batch_loader(paths=self._gallery, batch_size=config.BATCH_SIZE)    
+
     def load(self):
         self._train = process_dir(self.train_dir, relabel=True)
         self._query = process_dir(self.query_dir, relabel= False)

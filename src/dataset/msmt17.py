@@ -1,6 +1,6 @@
 from base import Object, config
 import os.path as osp
-from utils import pluck_msmt, print_split_samples
+from utils import pluck_msmt, print_split_samples, batch_loader
 
 
 class MSMT17(Object):
@@ -10,6 +10,19 @@ class MSMT17(Object):
         self._query, self._gallery = [], []
         self.num_train_ids, self.num_val_ids, self.num_trainval_ids = 0, 0, 0
         return
+    
+    def train_loader(self):
+        return batch_loader(paths=self._train, batch_size=config.BATCH_SIZE)
+    
+    def val_loader(self):
+        return batch_loader(paths=self._val, batch_size=config.BATCH_SIZE)
+    
+    def query_loader(self):
+        return batch_loader(paths=self._query, batch_size=config.BATCH_SIZE)
+    
+    def gallery_loader(self):
+        return batch_loader(paths=self._gallery, batch_size=config.BATCH_SIZE)
+
     def load(self):
         self._train, train_pids = pluck_msmt(osp.join(self._root, 'list_train.txt'), 'train')
         self._val, val_pids = pluck_msmt(osp.join( self._root, 'list_val.txt'), 'train')

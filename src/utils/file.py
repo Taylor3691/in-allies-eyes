@@ -1,8 +1,10 @@
 import re
 from pathlib import Path
-from base import Object
+from base import Object, config
 import os.path as osp
 import glob
+import cv2 
+
 
 def process_dir(dir_path: Path, relabel: bool):
     items = []
@@ -63,3 +65,37 @@ def pluck_msmt(list_file, subdir, pattern=re.compile(r'([-\d]+)_([-\d]+)_([-\d]+
             pids.append(pid)
         ret.append((osp.join(subdir,fname), pid, cam))
     return ret, pids
+
+
+def batch_loader(paths, batch_size: int = config.BATCH_SIZE):
+    """
+    Tải ảnh theo từng batch từ danh sách đường dẫn.
+
+    Input:
+        paths: Danh sách đường dẫn hoặc item dataset.
+            - Nếu phần tử là str/Path: coi như đường dẫn ảnh.
+            - Nếu phần tử là tuple/list: lấy phần tử [0] làm đường dẫn ảnh.
+        batch_size: Số lượng ảnh tối đa mỗi batch (mặc định từ config).
+
+    Output:
+        Generator trả về tuple (batch_images, batch_indices) cho mỗi batch.
+    """
+    for i in range(0, len(paths), batch_size):
+        batch = []
+        batch_indices = []
+
+        for j in range(i, min(i + batch_size, len(paths))):
+            item = paths[j]
+            img_path = item[0] if isinstance(item, (tuple, list)) else item
+            img = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
+
+            if img is None:
+                continue
+
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            batch.append(img)
+            batch_indices.append(j)
+
+        if batch:
+            yield batch, batch_indices
+    return
