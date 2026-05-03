@@ -9,3 +9,5 @@ from dataset import MSMT17
 msmt = MSMT17()
 
 msmt.load()
+
+msmt.info()

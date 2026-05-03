@@ -1,6 +1,6 @@
 from base import Object, config
 from pathlib import Path
-from utils import process_dir, get_metadata
+from utils import process_dir, get_metadata, print_split_samples
 
 class Market1501(Object):
 
@@ -37,10 +37,17 @@ class Market1501(Object):
         print("  ----------------------------------------")
         print("  subset   | # ids | # images | # cameras")
         print("  ----------------------------------------")
-        print("  train    | {:5d} | {:8d} | {:9d}".format(self.num_train_pids, self.num_train_imgs, self.num_train_cams))
-        print("  query    | {:5d} | {:8d} | {:9d}".format(self.num_query_pids, self.num_query_imgs, self.num_query_cams))
-        print("  gallery  | {:5d} | {:8d} | {:9d}".format(self.num_gallery_pids, self.num_gallery_imgs, self.num_gallery_cams))
+        print("  train    | {:5d} | {:8d} | {:9d}"
+              .format(self.num_train_pids, self.num_train_imgs, self.num_train_cams))
+        print("  query    | {:5d} | {:8d} | {:9d}"
+              .format(self.num_query_pids, self.num_query_imgs, self.num_query_cams))
+        print("  gallery  | {:5d} | {:8d} | {:9d}"
+              .format(self.num_gallery_pids, self.num_gallery_imgs, self.num_gallery_cams))
         print("  ----------------------------------------")
+
+        print_split_samples("train", self._train, k=5)
+        print_split_samples("query", self._query, k=5)
+        print_split_samples("gallery", self._gallery, k=5)
         return
     
     def accept():
