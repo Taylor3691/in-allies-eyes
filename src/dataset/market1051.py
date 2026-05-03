@@ -17,9 +17,9 @@ class Market1501(Object):
 
         return
     def load(self):
-        self._train = process_dir(self, self.train_dir, relabel=True)
-        self._query = process_dir(self, self.query_dir, relabel= False)
-        self._gallery = process_dir(self, self.gallery_dir, relabel= False)
+        self._train = process_dir(self.train_dir, relabel=True)
+        self._query = process_dir(self.query_dir, relabel= False)
+        self._gallery = process_dir(self.gallery_dir, relabel= False)
 
         return 
     def save(self):

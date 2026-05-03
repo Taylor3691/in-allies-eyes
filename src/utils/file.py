@@ -4,7 +4,7 @@ from base import Object
 import os.path as osp
 import glob
 
-def process_dir(dataset: Object, dir_path: Path, relabel: bool):
+def process_dir(dir_path: Path, relabel: bool):
     items = []
     pid_set = set()
     pattern = re.compile(r"([-\d]+)_c(\d)")
@@ -50,5 +50,18 @@ def check_before_run(dataset: Object):
         raise RuntimeError("'{}' is not available".format(dataset.query_dir))
     if not osp.exists(dataset.gallery_dir):
         raise RuntimeError("'{}' is not available".format(dataset.gallery_dir))
-    
     return
+
+def pluck_msmt(list_file, subdir, pattern=re.compile(r'([-\d]+)_([-\d]+)_([-\d]+)')):
+    with open(list_file, 'r') as f:
+        lines = f.readlines()
+    ret = []
+    pids = []
+    for line in lines:
+        line = line.strip()
+        fname = line.split(' ')[0]
+        pid, _, cam = map(int, pattern.search(osp.basename(fname)).groups())
+        if pid not in pids:
+            pids.append(pid)
+        ret.append((osp.join(subdir,fname), pid, cam))
+    return ret, pids
