@@ -151,14 +151,14 @@ Use `--dry-run` first to inspect the generated command list. Commands are logged
 
 ### Figure 3 Neighbor Analysis
 
-Compute inter-camera proportion, weight, same-identity accuracy, and same-identity weight statistics across clustering epochs:
+Neighbor analysis has been merged into the Table 3 Clustering Ablation script (`run_tab3_ablation.py`) to avoid duplicate training runs. When you run the Table 3 clustering ablation, the neighbor-analysis files are automatically generated alongside training:
 
 ```bash
 # Market1501
-python scripts/run_fig3_neighbors.py --dataset market1501
+python scripts/run_tab3_ablation.py --dataset market1501 --scene clustering
 
 # GRID
-python scripts/run_fig3_neighbors.py --dataset grid
+python scripts/run_tab3_ablation.py --dataset grid --scene clustering
 ```
 
 ---
@@ -183,7 +183,7 @@ Plot Figure 3-style curves from neighbor-analysis CSV files:
 ```bash
 python scripts/plot_experiments.py \
   --kind fig3 \
-  --input logs/experiments/fig3_neighbors/market1501/*/neighbor_analysis.csv
+  --input logs/experiments/tab3/clustering/market1501/*/neighbor_analysis.csv
 ```
 
 Plot Figure 4-style curves from sweep results:

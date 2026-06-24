@@ -68,6 +68,7 @@ def clustering_command(args, variant):
             "-j", args.workers,
         ), logs_dir, logs_dir / "log_test.txt"
 
+    analysis_file = logs_dir / "neighbor_analysis.csv"
     return python_cmd(
         "train_caj.py",
         "-d", args.dataset,
@@ -80,6 +81,8 @@ def clustering_command(args, variant):
         "-b", args.batch_size,
         "-j", args.workers,
         "--jaccard-memory", args.jaccard_memory,
+        "--neighbor-analysis",
+        "--neighbor-analysis-file", analysis_file,
         *variant_flags(variant),
     ), logs_dir, logs_dir / "log.txt"
 
