@@ -86,12 +86,12 @@ The GRID dataset contains only 1,275 images across 250 paired identities and 775
 
 ### Training BoT on GRID
 
-A dedicated GRID configuration file is provided at `src/thirdparty/bot/configs/softmax_triplet_with_center_grid.yml`. It has been optimized for GRID's smaller scale (batch size 32, num instances 2, 80 training epochs, and learning rate step decays at [30, 55]).
+A dedicated GRID configuration file is provided at `thirdparty/bot/configs/softmax_triplet_with_center_grid.yml`. It has been optimized for GRID's smaller scale (batch size 32, num instances 2, 80 training epochs, and learning rate step decays at [30, 55]).
 
 To train the Bag-of-Tricks model on the custom 80/20 GRID split:
 
 ```bash
-cd src/thirdparty/bot
+cd thirdparty/bot
 python tools/train.py \
   --config_file configs/softmax_triplet_with_center_grid.yml
 ```
@@ -99,7 +99,7 @@ python tools/train.py \
 To train on a specific standard fold (e.g. fold 0):
 
 ```bash
-cd src/thirdparty/bot
+cd thirdparty/bot
 python tools/train.py \
   --config_file configs/softmax_triplet_with_center_grid.yml \
   DATASETS.NAMES "('grid_0')"
