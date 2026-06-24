@@ -67,10 +67,18 @@ def get_train_loader(args, dataset, height, width, batch_size, workers,
             sampler = RandomMultipleGallerySampler(train_set, num_instances)
     else:
         sampler = None
+
+    total_samples = len(sampler) if sampler is not None else len(train_set)
+    drop_last = True
+    if total_samples < batch_size:
+        drop_last = False
+        print("Warning: train set size ({}) is smaller than batch_size ({}). "
+              "Setting drop_last=False to prevent empty dataloader.".format(total_samples, batch_size))
+
     train_loader = IterLoader(
         DataLoader(Preprocessor(train_set, root=dataset.images_dir, transform=train_transformer),
                    batch_size=batch_size, num_workers=workers, sampler=sampler,
-                   shuffle=not rmgs_flag, pin_memory=True, drop_last=True), length=iters)
+                   shuffle=not rmgs_flag, pin_memory=True, drop_last=drop_last), length=iters)
 
     return train_loader
 
