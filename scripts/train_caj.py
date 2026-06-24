@@ -276,8 +276,7 @@ def main_worker(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="CA-Jaccard: Camera-aware Jaccard Distance for Person Re-identification")
     # data
-    parser.add_argument('-d', '--dataset', type=str, default='market1501',
-                        choices=datasets.names())
+    parser.add_argument('-d', '--dataset', type=str, default='market1501')
     parser.add_argument('-b', '--batch-size', type=int, default=256)
     parser.add_argument('-j', '--workers', type=int, default=4)
     parser.add_argument('--height', type=int, default=256, help="input height")
