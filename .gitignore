@@ -1,4 +1,10 @@
+__pycache__
 .venv
-data/*
-__pycache__/
 .vscode
+
+/data
+/pretrained_models
+/logs
+/results
+
+/*.toml
