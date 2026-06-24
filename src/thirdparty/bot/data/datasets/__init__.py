@@ -9,6 +9,7 @@ from .market1501 import Market1501
 from .msmt17 import MSMT17
 # from .veri import VeRi
 from .grid import GRID
+from .dataset_loader import ImageDataset
 
 __factory = {
     'market1501': Market1501,
