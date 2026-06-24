@@ -121,6 +121,9 @@ def main():
     parser.add_argument(
         "--config_file", default="", help="path to config file", type=str
     )
+    parser.add_argument(
+        "--seed", default=100, type=int, help="random seed for initialization"
+    )
     parser.add_argument("opts", help="Modify config options using the command-line", default=None,
                         nargs=argparse.REMAINDER)
 
@@ -150,7 +153,21 @@ def main():
 
     if cfg.MODEL.DEVICE == "cuda":
         os.environ['CUDA_VISIBLE_DEVICES'] = cfg.MODEL.DEVICE_ID    # new add by gu
-    cudnn.benchmark = True
+
+    if args.seed is not None:
+        import random
+        import numpy as np
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
+        cudnn.deterministic = True
+        cudnn.benchmark = False
+        logger.info("Set random seed to {}".format(args.seed))
+    else:
+        cudnn.benchmark = True
+
     train(cfg)
 
 
