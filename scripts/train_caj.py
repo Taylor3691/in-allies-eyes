@@ -17,6 +17,10 @@ from torch.backends import cudnn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
+src_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src')
+if src_root not in sys.path:
+    sys.path.insert(0, src_root)
+
 from caj import datasets
 from caj import models
 from caj.models.cm import ClusterMemory

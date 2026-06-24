@@ -4,9 +4,6 @@ import os.path as osp
 import random
 import numpy as np
 import sys
-src_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src')
-if src_root not in sys.path:
-    sys.path.insert(0, src_root)
 from collections import OrderedDict
 
 import torch
@@ -14,6 +11,10 @@ from torch import nn
 from torch.nn import functional as F
 from torch.backends import cudnn
 from torch.utils.data import DataLoader
+
+src_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src')
+if src_root not in sys.path:
+    sys.path.insert(0, src_root)
 
 from caj import datasets
 from caj import models
