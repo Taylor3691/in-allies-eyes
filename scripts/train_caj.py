@@ -303,7 +303,7 @@ if __name__ == '__main__':
     parser.add_argument('--temp', type=float, default=0.05,
                         help="temperature for scaling contrastive loss")
     # path
-    working_dir = osp.dirname(osp.abspath(__file__))
+    working_dir = osp.dirname(osp.dirname(osp.abspath(__file__)))
     parser.add_argument('--pretrain-path', type=str, metavar='PATH',
                         default=osp.join(working_dir, 'pretrained_models', 'resnet50-11ad3fa6.pth'),
                         help='local ImageNet pretrained ResNet checkpoint; set empty to use torchvision defaults')

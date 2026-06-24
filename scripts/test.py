@@ -221,8 +221,7 @@ if __name__ == '__main__':
     parser.add_argument('--test-source', action='store_true',
                         help="test on the source domain")
     parser.add_argument('--seed', type=int, default=1)
-    # path
-    working_dir = osp.dirname(osp.abspath(__file__))
+    working_dir = osp.dirname(osp.dirname(osp.abspath(__file__)))
     parser.add_argument('--data-dir', type=str, metavar='PATH',
                         default='data')
     parser.add_argument('--logs-dir', type=str, metavar='PATH', default='',
