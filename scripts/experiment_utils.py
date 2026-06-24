@@ -9,9 +9,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 DATASET_DEFAULTS = {
-    "market1501": {"eps": 0.4, "iters": 200, "height": 256, "width": 128},
-    "msmt17": {"eps": 0.6, "iters": 400, "height": 256, "width": 128},
-    "grid": {"eps": 0.3, "iters": 100, "height": 256, "width": 128},
+    "market1501": {"eps": 0.4, "iters": 200, "height": 256, "width": 128,
+                   "batch_size": 256, "epochs": 50, "num_instances": 16},
+    "msmt17": {"eps": 0.6, "iters": 400, "height": 256, "width": 128,
+               "batch_size": 256, "epochs": 50, "num_instances": 16},
+    "grid": {"eps": 0.3, "iters": 100, "height": 256, "width": 128,
+             "batch_size": 64, "epochs": 30, "num_instances": 4},
 }
 
 

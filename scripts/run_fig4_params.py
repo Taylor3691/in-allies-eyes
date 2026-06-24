@@ -48,14 +48,15 @@ def parse_args():
                         help="BoT BNNeck feature used by test.py for re-ranking")
     parser.add_argument("--bot-no-feat-norm", action="store_true",
                         help="disable L2 normalization of BoT test features")
-    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="Override batch size (default: per-dataset from DATASET_DEFAULTS)")
     parser.add_argument(
         "--num-instances",
         type=int,
         default=None,
         help=(
-            "Override train_caj.py --num-instances for clustering scene. "
-            "Smaller values (e.g. 4 or 8) work better with small batch sizes on low-VRAM GPUs."
+            "Override train_caj.py --num-instances for clustering scene "
+            "(default: per-dataset from DATASET_DEFAULTS)."
         ),
     )
     parser.add_argument("--workers", type=int, default=4)
@@ -72,8 +73,9 @@ def clustering_command(args, sweep_name, label, extra_flags):
     defaults = DATASET_DEFAULTS[args.dataset]
     logs_dir = Path(args.logs_root) / "clustering" / args.dataset / sweep_name / label
     iters = defaults["iters"] if args.iters is None else args.iters
-    epochs_flags = [] if args.epochs is None else ["--epochs", args.epochs]
-    num_instances_flags = [] if args.num_instances is None else ["--num-instances", args.num_instances]
+    batch_size = args.batch_size if args.batch_size is not None else defaults["batch_size"]
+    epochs = args.epochs if args.epochs is not None else defaults["epochs"]
+    num_instances = args.num_instances if args.num_instances is not None else defaults["num_instances"]
     return python_cmd(
         "train_caj.py",
         "-d", args.dataset,
@@ -83,12 +85,12 @@ def clustering_command(args, sweep_name, label, extra_flags):
         "--iters", iters,
         "--height", defaults["height"],
         "--width", defaults["width"],
-        "-b", args.batch_size,
+        "-b", batch_size,
+        "--epochs", epochs,
+        "--num-instances", num_instances,
         "-j", args.workers,
         "--jaccard-memory", args.jaccard_memory,
         "--ckrnns", "--clqe",
-        *epochs_flags,
-        *num_instances_flags,
         *extra_flags,
     ), logs_dir
 

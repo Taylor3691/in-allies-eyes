@@ -42,7 +42,12 @@ def parse_args():
                         help="BoT BNNeck feature used by test.py for re-ranking")
     parser.add_argument("--bot-no-feat-norm", action="store_true",
                         help="disable L2 normalization of BoT test features")
-    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="Override batch size (default: per-dataset from DATASET_DEFAULTS)")
+    parser.add_argument("--epochs", type=int, default=None,
+                        help="Override training epochs (default: per-dataset from DATASET_DEFAULTS)")
+    parser.add_argument("--num-instances", type=int, default=None,
+                        help="Override num instances per identity (default: per-dataset from DATASET_DEFAULTS)")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--jaccard-memory", choices=["auto", "dense", "sparse"], default="auto",
                         help="memory strategy for clustering Jaccard distance")
@@ -75,6 +80,9 @@ def clustering_command(args, variant):
             "-j", args.workers,
         ), logs_dir, logs_dir / "log_test.txt"
 
+    batch_size = args.batch_size if args.batch_size is not None else defaults["batch_size"]
+    epochs = args.epochs if args.epochs is not None else defaults["epochs"]
+    num_instances = args.num_instances if args.num_instances is not None else defaults["num_instances"]
     analysis_file = logs_dir / "neighbor_analysis.csv"
     return python_cmd(
         "train_caj.py",
@@ -85,7 +93,9 @@ def clustering_command(args, variant):
         "--iters", defaults["iters"],
         "--height", defaults["height"],
         "--width", defaults["width"],
-        "-b", args.batch_size,
+        "-b", batch_size,
+        "--epochs", epochs,
+        "--num-instances", num_instances,
         "-j", args.workers,
         "--jaccard-memory", args.jaccard_memory,
         "--neighbor-analysis",
