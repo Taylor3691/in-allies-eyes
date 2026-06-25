@@ -22,86 +22,110 @@ use_kalman_global = False
 # Global Re-ID Model variables for lazy loading
 reid_model = None
 reid_model_lock = threading.Lock()
+_model_loading_thread = None
+_model_loading_error = None
+
+def _bg_load_model():
+    global reid_model, _model_loading_error
+    try:
+        import torch
+        import torch.nn as nn
+        import torch.nn.functional as F
+        from caj.utils.serialization import load_checkpoint, copy_state_dict
+
+        class NormalizedFeatureModel(nn.Module):
+            def __init__(self, model, normalize=True):
+                super(NormalizedFeatureModel, self).__init__()
+                self.model = model
+                self.normalize = normalize
+
+            def forward(self, inputs):
+                outputs = self.model(inputs)
+                if isinstance(outputs, (tuple, list)):
+                    outputs = outputs[0]
+                if self.normalize:
+                    outputs = F.normalize(outputs, dim=1, p=2)
+                return outputs
+
+        bot_root = os.path.join(os.path.dirname(__file__), 'src', 'thirdparty', 'bot')
+        if bot_root not in sys.path:
+            sys.path.insert(0, bot_root)
+        from modeling.baseline import Baseline
+
+        # Market-1501 dataset has 751 train pids
+        num_classes = 751
+        raw_model = Baseline(
+            num_classes=num_classes,
+            last_stride=1,
+            model_path='',
+            neck='bnneck',
+            neck_feat='after',
+            model_name='resnet50',
+            pretrain_choice='none',
+        )
+        model = NormalizedFeatureModel(raw_model, normalize=True)
+
+        checkpoint_path = os.path.join(os.path.dirname(__file__), 'pretrained_models', 'market_resnet50_model_120_rank1_945.pth')
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}. Please run scripts/download_pretrained_models.py demo.")
+
+        checkpoint = load_checkpoint(checkpoint_path)
+        raw_state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        state_dict = OrderedDict()
+        layer_map = {
+            'base.conv1.': 'base.0.',
+            'base.bn1.': 'base.1.',
+            'base.layer1.': 'base.4.',
+            'base.layer2.': 'base.5.',
+            'base.layer3.': 'base.6.',
+            'base.layer4.': 'base.7.',
+            'bottleneck.': 'feat_bn.',
+        }
+        for name, param in raw_state_dict.items():
+            if name.startswith('classifier.'):
+                continue
+            new_name = name
+            for old_prefix, new_prefix in layer_map.items():
+                if name.startswith(old_prefix):
+                    new_name = new_prefix + name[len(old_prefix):]
+                    break
+            state_dict[new_name] = param
+
+        copy_state_dict(state_dict, model.model, strip='module.')
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model.to(device)
+        model.eval()
+
+        reid_model = (model, device)
+        print("==> Re-ID model loaded successfully in background thread.")
+    except Exception as e:
+        _model_loading_error = e
+        import traceback
+        traceback.print_exc()
 
 def get_reid_model():
-    global reid_model
-    if reid_model is None:
-        with reid_model_lock:
-            if reid_model is None:
-                print("==> Initializing Re-ID model lazily...")
-                checkpoint_path = os.path.join(os.path.dirname(__file__), 'pretrained_models', 'market_resnet50_model_120_rank1_945.pth')
-                if not os.path.exists(checkpoint_path):
-                    raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}. Please run scripts/download_pretrained_models.py demo.")
+    global reid_model, _model_loading_thread, _model_loading_error
+    if reid_model is not None:
+        return reid_model
 
-                import torch
-                import torch.nn as nn
-                import torch.nn.functional as F
-                from caj.utils.serialization import load_checkpoint, copy_state_dict
+    with reid_model_lock:
+        if reid_model is None:
+            if _model_loading_thread is None:
+                print("==> Starting Re-ID model lazy load in background thread...")
+                _model_loading_error = None
+                _model_loading_thread = threading.Thread(target=_bg_load_model)
+                _model_loading_thread.start()
 
-                class NormalizedFeatureModel(nn.Module):
-                    def __init__(self, model, normalize=True):
-                        super(NormalizedFeatureModel, self).__init__()
-                        self.model = model
-                        self.normalize = normalize
+            # Yield control periodically to allow event loops (Uvicorn heartbeat, OpenCV webcam stream) to run
+            while _model_loading_thread.is_alive():
+                time.sleep(0.05)
 
-                    def forward(self, inputs):
-                        outputs = self.model(inputs)
-                        if isinstance(outputs, (tuple, list)):
-                            outputs = outputs[0]
-                        if self.normalize:
-                            outputs = F.normalize(outputs, dim=1, p=2)
-                        return outputs
-
-                bot_root = os.path.join(os.path.dirname(__file__), 'src', 'thirdparty', 'bot')
-                if bot_root not in sys.path:
-                    sys.path.insert(0, bot_root)
-                from modeling.baseline import Baseline
-
-                # Market-1501 dataset has 751 train pids
-                num_classes = 751
-                raw_model = Baseline(
-                    num_classes=num_classes,
-                    last_stride=1,
-                    model_path='',
-                    neck='bnneck',
-                    neck_feat='after',
-                    model_name='resnet50',
-                    pretrain_choice='none',
-                )
-                model = NormalizedFeatureModel(raw_model, normalize=True)
-
-                checkpoint = load_checkpoint(checkpoint_path)
-                raw_state_dict = checkpoint['state_dict']
-
-                from collections import OrderedDict
-                state_dict = OrderedDict()
-                layer_map = {
-                    'base.conv1.': 'base.0.',
-                    'base.bn1.': 'base.1.',
-                    'base.layer1.': 'base.4.',
-                    'base.layer2.': 'base.5.',
-                    'base.layer3.': 'base.6.',
-                    'base.layer4.': 'base.7.',
-                    'bottleneck.': 'feat_bn.',
-                }
-                for name, param in raw_state_dict.items():
-                    if name.startswith('classifier.'):
-                        continue
-                    new_name = name
-                    for old_prefix, new_prefix in layer_map.items():
-                        if name.startswith(old_prefix):
-                            new_name = new_prefix + name[len(old_prefix):]
-                            break
-                    state_dict[new_name] = param
-
-                copy_state_dict(state_dict, model.model, strip='module.')
-
-                device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-                model.to(device)
-                model.eval()
-
-                reid_model = (model, device)
-                print("==> Re-ID model loaded successfully.")
+            _model_loading_thread = None
+            if _model_loading_error is not None:
+                raise _model_loading_error
 
     return reid_model
 
@@ -112,21 +136,249 @@ def update_kalman_state(val):
 # Global cached gallery data
 cached_gallery_data = None
 
+def capture_live_fallback(use_kf=False):
+    global latest_frame, camera_active, tracker
+    
+    # Case 1: Camera is already running
+    if camera_active and latest_frame is not None:
+        latest_bgr = cv2.cvtColor(latest_frame, cv2.COLOR_RGB2BGR)
+        gray = cv2.cvtColor(latest_bgr, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        raw_bbox = None
+        if len(faces) > 0:
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            raw_bbox = faces[0]
+
+        crop_bgr = None
+        if use_kf:
+            kf_rect = tracker.get_rect()
+            if kf_rect is not None:
+                kx, ky, kw, kh = kf_rect
+                fh, fw_img, _ = latest_bgr.shape
+                kx = max(0, min(kx, fw_img))
+                ky = max(0, min(ky, fh))
+                kw = max(1, min(kw, fw_img - kx))
+                kh = max(1, min(kh, fh - ky))
+                crop_bgr = latest_bgr[ky:ky+kh, kx:kx+kw]
+            elif raw_bbox is not None:
+                rx, ry, rw, rh = raw_bbox
+                fh, fw_img, _ = latest_bgr.shape
+                rx = max(0, min(rx, fw_img))
+                ry = max(0, min(ry, fh))
+                rw = max(1, min(rw, fw_img - rx))
+                rh = max(1, min(rh, fh - ry))
+                crop_bgr = latest_bgr[ry:ry+rh, rx:rx+rw]
+        else:
+            if raw_bbox is not None:
+                rx, ry, rw, rh = raw_bbox
+                fh, fw_img, _ = latest_bgr.shape
+                rx = max(0, min(rx, fw_img))
+                ry = max(0, min(ry, fh))
+                rw = max(1, min(rw, fw_img - rx))
+                rh = max(1, min(rh, fh - ry))
+                crop_bgr = latest_bgr[ry:ry+rh, rx:rx+rw]
+                
+        if crop_bgr is not None and crop_bgr.size > 0:
+            return cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB), "Active Webcam"
+        return None, "Active Webcam (No face detected)"
+
+    # Case 2: Camera is not running, open it temporarily
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        return None, "Webcam Offline"
+        
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    
+    crop_bgr = None
+    crop_source = "None"
+    
+    # Read up to 15 frames to let auto-exposure adjust and look for a face
+    for _ in range(15):
+        ret, frame = cap.read()
+        if not ret:
+            time.sleep(0.03)
+            continue
+            
+        frame = cv2.flip(frame, 1)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        if len(faces) > 0:
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            rx, ry, rw, rh = faces[0]
+            
+            fh, fw_img, _ = frame.shape
+            rx = max(0, min(rx, fw_img))
+            ry = max(0, min(ry, fh))
+            rw = max(1, min(rw, fw_img - rx))
+            rh = max(1, min(rh, fh - ry))
+            crop_bgr = frame[ry:ry+rh, rx:rx+rw]
+            crop_source = "Raw bbox (webcam capture)"
+            break
+            
+        time.sleep(0.03)
+        
+    # If no face was detected in any of the 15 frames, just capture the full center of the last frame as fallback
+    if crop_bgr is None:
+        ret, frame = cap.read()
+        if ret:
+            frame = cv2.flip(frame, 1)
+            fh, fw_img, _ = frame.shape
+            cx, cy = fw_img // 2, fh // 2
+            size = min(fh, fw_img) // 2
+            crop_bgr = frame[cy-size:cy+size, cx-size:cx+size]
+            crop_source = "Center crop fallback"
+            
+    cap.release()
+    
+    if crop_bgr is not None and crop_bgr.size > 0:
+        return cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB), crop_source
+    return None, "Failed to capture frame"
+
+def capture_live_both():
+    global latest_frame, camera_active, tracker
+    
+    # Case 1: Camera is already running
+    if camera_active and latest_frame is not None:
+        latest_bgr = cv2.cvtColor(latest_frame, cv2.COLOR_RGB2BGR)
+        gray = cv2.cvtColor(latest_bgr, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        raw_bbox = None
+        if len(faces) > 0:
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            raw_bbox = faces[0]
+
+        raw_crop_rgb = None
+        if raw_bbox is not None:
+            rx, ry, rw, rh = raw_bbox
+            fh, fw_img, _ = latest_bgr.shape
+            rx = max(0, min(rx, fw_img))
+            ry = max(0, min(ry, fh))
+            rw = max(1, min(rw, fw_img - rx))
+            rh = max(1, min(rh, fh - ry))
+            crop_bgr = latest_bgr[ry:ry+rh, rx:rx+rw]
+            if crop_bgr.size > 0:
+                raw_crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
+
+        kalman_crop_rgb = None
+        kf_rect = tracker.get_rect()
+        if kf_rect is not None:
+            kx, ky, kw, kh = kf_rect
+            fh, fw_img, _ = latest_bgr.shape
+            kx = max(0, min(kx, fw_img))
+            ky = max(0, min(ky, fh))
+            kw = max(1, min(kw, fw_img - kx))
+            kh = max(1, min(kh, fh - ky))
+            crop_bgr = latest_bgr[ky:ky+kh, kx:kx+kw]
+            if crop_bgr.size > 0:
+                kalman_crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
+                
+        return raw_crop_rgb, kalman_crop_rgb, "Active Webcam"
+
+    # Case 2: Camera is not running, open it temporarily
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        return None, None, "Webcam Offline"
+        
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    
+    raw_crop_rgb = None
+    kalman_crop_rgb = None
+    crop_source = "None"
+    
+    for _ in range(15):
+        ret, frame = cap.read()
+        if not ret:
+            time.sleep(0.03)
+            continue
+            
+        frame = cv2.flip(frame, 1)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        if len(faces) > 0:
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            rx, ry, rw, rh = faces[0]
+            
+            fh, fw_img, _ = frame.shape
+            rx = max(0, min(rx, fw_img))
+            ry = max(0, min(ry, fh))
+            rw = max(1, min(rw, fw_img - rx))
+            rh = max(1, min(rh, fh - ry))
+            crop_bgr = frame[ry:ry+rh, rx:rx+rw]
+            if crop_bgr.size > 0:
+                raw_crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
+                kalman_crop_rgb = raw_crop_rgb
+                crop_source = "Raw bbox (webcam capture)"
+            break
+            
+        time.sleep(0.03)
+        
+    if raw_crop_rgb is None:
+        ret, frame = cap.read()
+        if ret:
+            frame = cv2.flip(frame, 1)
+            fh, fw_img, _ = frame.shape
+            cx, cy = fw_img // 2, fh // 2
+            size = min(fh, fw_img) // 2
+            crop_bgr = frame[cy-size:cy+size, cx-size:cx+size]
+            if crop_bgr.size > 0:
+                raw_crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
+                kalman_crop_rgb = raw_crop_rgb
+                crop_source = "Center crop fallback"
+            
+    cap.release()
+    return raw_crop_rgb, kalman_crop_rgb, crop_source
+
 def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
-    global cached_gallery_data
+    global cached_gallery_data, use_kalman_global
+    print(f"\n==> search_gallery called! query_img_type={type(query_img)}, use_caj={use_caj}, top_k={top_k}, query_cam_id={query_cam_id}")
+    
+    # Fallback to live webcam crop if no query image is uploaded/snapshotted
     if query_img is None:
-        return [], []
+        print("==> search_gallery: query_img is None. Checking live webcam...")
+        crop_rgb, crop_source = capture_live_fallback(use_kf=use_kalman_global)
+        if crop_rgb is not None:
+            query_img = crop_rgb
+            print(f"==> search_gallery: successfully captured crop from {crop_source}!")
+        else:
+            print(f"==> search_gallery: live fallback failed: {crop_source}")
+
+    if query_img is None:
+        print("==> search_gallery: query_img is None!")
+        return [], [], None
 
     try:
         # 1. Lazy load model
         model, device = get_reid_model()
+        print("==> get_reid_model returned successfully.")
         
         # 2. Extract query feature
         import torch
         from PIL import Image
         import torchvision.transforms as T_vision
         
-        pil_img = Image.fromarray(query_img)
+        if isinstance(query_img, str):
+            pil_img = Image.open(query_img).convert('RGB')
+        elif isinstance(query_img, np.ndarray):
+            pil_img = Image.fromarray(query_img)
+        elif isinstance(query_img, dict):
+            img_val = query_img.get("composite", query_img.get("background", None))
+            if img_val is None:
+                return [], [], None
+            if isinstance(img_val, str):
+                pil_img = Image.open(img_val).convert('RGB')
+            elif isinstance(img_val, np.ndarray):
+                pil_img = Image.fromarray(img_val)
+            else:
+                pil_img = img_val
+        elif isinstance(query_img, Image.Image):
+            pil_img = query_img
+        else:
+            pil_img = Image.fromarray(np.uint8(query_img))
+
         normalizer = T_vision.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         transformer = T_vision.Compose([
             T_vision.Resize((256, 128), interpolation=T_vision.InterpolationMode.BICUBIC),
@@ -144,7 +396,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
         if cached_gallery_data is None:
             cache_path = os.path.join(os.path.dirname(__file__), 'market1501_gallery_features.npy')
             if not os.path.exists(cache_path):
-                return [("https://via.placeholder.com/150?text=Run+Cache+Script+First", "Cache not found")], []
+                return [("https://via.placeholder.com/150?text=Run+Cache+Script+First", "Cache not found")], [], None
             cached_gallery_data = np.load(cache_path, allow_pickle=True).item()
 
         g_features = cached_gallery_data['features']
@@ -249,24 +501,35 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
             else:
                 final_results.append((np.zeros((128, 64, 3), dtype=np.uint8), f"Missing: {os.path.basename(img_path)}"))
 
-        return baseline_results, final_results
+        return baseline_results, final_results, query_img
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return [("https://via.placeholder.com/150", f"Error: {e}")], []
+        return [("https://via.placeholder.com/150", f"Error: {e}")], [], None
 
 def run_comparison(raw_img, kalman_img):
+    # Fallback to live webcam crops if query images are missing
     if raw_img is None or kalman_img is None:
-        return [], [], [], []
+        print("==> run_comparison: Query images are None. Checking live webcam...")
+        raw_crop, kalman_crop, crop_source = capture_live_both()
+        if raw_crop is not None:
+            raw_img = raw_crop
+        if kalman_crop is not None:
+            kalman_img = kalman_crop
+        print(f"==> run_comparison: capture result: {crop_source}")
+
+    if raw_img is None or kalman_img is None:
+        print("==> run_comparison: Query images are still None!")
+        return [], [], [], [], raw_img, kalman_img
     
     # Mode 1 & 3 use raw query, Mode 2 & 4 use Kalman-smoothed query
-    m1_out, _ = search_gallery(raw_img, use_caj=False, top_k=5, query_cam_id="0")
-    m2_out, _ = search_gallery(kalman_img, use_caj=False, top_k=5, query_cam_id="0")
-    _, m3_out = search_gallery(raw_img, use_caj=True, top_k=5, query_cam_id="0")
-    _, m4_out = search_gallery(kalman_img, use_caj=True, top_k=5, query_cam_id="0")
+    m1_out, _, _ = search_gallery(raw_img, use_caj=False, top_k=5, query_cam_id="0")
+    m2_out, _, _ = search_gallery(kalman_img, use_caj=False, top_k=5, query_cam_id="0")
+    _, m3_out, _ = search_gallery(raw_img, use_caj=True, top_k=5, query_cam_id="0")
+    _, m4_out, _ = search_gallery(kalman_img, use_caj=True, top_k=5, query_cam_id="0")
     
-    return m1_out, m2_out, m3_out, m4_out
+    return m1_out, m2_out, m3_out, m4_out, raw_img, kalman_img
 
 def reset_tracker():
     global tracker, missing_frames_counter
@@ -374,7 +637,7 @@ def toggle_camera(use_kf):
 def capture_query(use_kf, camera_id):
     global latest_frame
     if latest_frame is None:
-        return None, "No active frame captured", "N/A", "N/A"
+        return None, "No active frame captured", "N/A", "N/A", None, camera_id, None, None
 
     # Convert RGB frame back to BGR for OpenCV processing
     latest_bgr = cv2.cvtColor(latest_frame, cv2.COLOR_RGB2BGR)
@@ -386,37 +649,64 @@ def capture_query(use_kf, camera_id):
         faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
         raw_bbox = faces[0]
 
-    crop = None
-    source = "None"
+    # Extract raw crop
+    raw_crop_rgb = None
+    raw_crop_bgr = None
+    if raw_bbox is not None:
+        rx, ry, rw, rh = raw_bbox
+        fh, fw_img, _ = latest_bgr.shape
+        rx = max(0, min(rx, fw_img))
+        ry = max(0, min(ry, fh))
+        rw = max(1, min(rw, fw_img - rx))
+        rh = max(1, min(rh, fh - ry))
+        raw_crop_bgr = latest_bgr[ry:ry+rh, rx:rx+rw]
+        if raw_crop_bgr.size > 0:
+            raw_crop_rgb = cv2.cvtColor(raw_crop_bgr, cv2.COLOR_BGR2RGB)
 
+    # Extract Kalman crop
+    kalman_crop_rgb = None
+    kalman_crop_bgr = None
+    kf_rect = tracker.get_rect()
+    if kf_rect is not None:
+        kx, ky, kw, kh = kf_rect
+        fh, fw_img, _ = latest_bgr.shape
+        kx = max(0, min(kx, fw_img))
+        ky = max(0, min(ky, fh))
+        kw = max(1, min(kw, fw_img - kx))
+        kh = max(1, min(kh, fh - ky))
+        kalman_crop_bgr = latest_bgr[ky:ky+kh, kx:kx+kw]
+        if kalman_crop_bgr.size > 0:
+            kalman_crop_rgb = cv2.cvtColor(kalman_crop_bgr, cv2.COLOR_BGR2RGB)
+
+    # Determine preview and active crop
+    crop_rgb = None
+    crop_bgr = None
+    source = "None"
     if use_kf:
-        kf_rect = tracker.get_rect()
-        if kf_rect is not None:
-            kx, ky, kw, kh = kf_rect
-            fh, fw_img, _ = latest_bgr.shape
-            kx = max(0, min(kx, fw_img))
-            ky = max(0, min(ky, fh))
-            kw = max(1, min(kw, fw_img - kx))
-            kh = max(1, min(kh, fh - ky))
-            crop = latest_bgr[ky:ky+kh, kx:kx+kw]
+        if kalman_crop_rgb is not None:
+            crop_rgb = kalman_crop_rgb
+            crop_bgr = kalman_crop_bgr
             source = "Kalman bbox"
+        elif raw_crop_rgb is not None:
+            crop_rgb = raw_crop_rgb
+            crop_bgr = raw_crop_bgr
+            source = "Raw bbox (Kalman N/A)"
     else:
-        if raw_bbox is not None:
-            x, y, w, h = raw_bbox
-            crop = latest_bgr[y:y+h, x:x+w]
+        if raw_crop_rgb is not None:
+            crop_rgb = raw_crop_rgb
+            crop_bgr = raw_crop_bgr
             source = "Raw bbox"
 
-    if crop is None or crop.size == 0:
-        return None, "No target found to crop", "N/A", "N/A"
+    if crop_rgb is None:
+        return None, "No target found to crop", "N/A", "N/A", None, camera_id, None, None
 
-    crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
     quality = f"Contrast: {int(np.std(crop_rgb))}"
 
     # Save to disk
-    save_dir = "captured/kalman" if use_kf else "captured/original"
+    save_dir = "captured/kalman" if (use_kf and source.startswith("Kalman")) else "captured/original"
     os.makedirs(save_dir, exist_ok=True)
     filename = f"crop_{int(time.time())}.png"
-    cv2.imwrite(os.path.join(save_dir, filename), crop)
+    cv2.imwrite(os.path.join(save_dir, filename), crop_bgr)
 
     # Lazy-load model and run feature extraction to verify pipeline works
     try:
@@ -441,7 +731,7 @@ def capture_query(use_kf, camera_id):
     except Exception as e:
         print(f"Error during on-demand feature extraction: {e}")
 
-    return crop_rgb, source, camera_id, quality
+    return crop_rgb, source, camera_id, quality, crop_rgb, camera_id, raw_crop_rgb, kalman_crop_rgb
 
 # Gradio Blocks layout initialization
 with gr.Blocks(title="Person Re-ID Demo App") as demo:
@@ -538,9 +828,17 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
         trigger_mode="multiple"
     )
     btn_reset.click(fn=reset_tracker, inputs=[], outputs=[det_status, kf_mode])
-    btn_capture.click(fn=capture_query, inputs=[use_kalman, cam_id], outputs=[capture_preview, capture_source, capture_cam_id, frame_quality])
-    btn_search.click(fn=search_gallery, inputs=[query_upload, use_caj_ranking, top_k_selector, query_camera_id], outputs=[baseline_gallery, final_gallery], show_progress="full")
-    btn_run_compare.click(fn=run_comparison, inputs=[raw_query_img, kalman_query_img], outputs=[mode1_out, mode2_out, mode3_out, mode4_out], show_progress="full")
+    btn_capture.click(
+        fn=capture_query,
+        inputs=[use_kalman, cam_id],
+        outputs=[
+            capture_preview, capture_source, capture_cam_id, frame_quality,
+            query_upload, query_camera_id,
+            raw_query_img, kalman_query_img
+        ]
+    )
+    btn_search.click(fn=search_gallery, inputs=[query_upload, use_caj_ranking, top_k_selector, query_camera_id], outputs=[baseline_gallery, final_gallery, query_upload], show_progress="full")
+    btn_run_compare.click(fn=run_comparison, inputs=[raw_query_img, kalman_query_img], outputs=[mode1_out, mode2_out, mode3_out, mode4_out, raw_query_img, kalman_query_img], show_progress="full")
 
 if __name__ == "__main__":
     demo.launch()
