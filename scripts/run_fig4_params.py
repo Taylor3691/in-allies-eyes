@@ -99,6 +99,7 @@ def clustering_command(args, sweep_name, label, extra_flags):
 def rerank_command(args, sweep_name, label, extra_flags):
     defaults = DATASET_DEFAULTS[args.dataset]
     logs_dir = Path(args.logs_root) / "reranking" / args.dataset / sweep_name / label
+    batch_size = args.batch_size if args.batch_size is not None else defaults["batch_size"]
     cmd = python_cmd(
         "test.py",
         "-d", args.dataset,
@@ -109,7 +110,7 @@ def rerank_command(args, sweep_name, label, extra_flags):
         "--bot-neck-feat", args.bot_neck_feat,
         "--height", defaults["height"],
         "--width", defaults["width"],
-        "-b", args.batch_size,
+        "-b", batch_size,
         "-j", args.workers,
         "--rerank", "--ckrnns", "--clqe",
         *extra_flags,

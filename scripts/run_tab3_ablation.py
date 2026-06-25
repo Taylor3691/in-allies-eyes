@@ -108,6 +108,7 @@ def clustering_command(args, variant):
 def rerank_command(args, variant):
     defaults = DATASET_DEFAULTS[args.dataset]
     logs_dir = Path(args.logs_root) / "reranking" / args.dataset / variant
+    batch_size = args.batch_size if args.batch_size is not None else defaults["batch_size"]
     cmd = python_cmd(
         "test.py",
         "-d", args.dataset,
@@ -118,7 +119,7 @@ def rerank_command(args, variant):
         "--bot-neck-feat", args.bot_neck_feat,
         "--height", defaults["height"],
         "--width", defaults["width"],
-        "-b", args.batch_size,
+        "-b", batch_size,
         "-j", args.workers,
     )
     if args.bot_no_feat_norm:

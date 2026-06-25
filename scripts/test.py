@@ -84,7 +84,7 @@ def build_bot_model(args, num_classes):
     if args.arch != 'resnet50':
         raise ValueError("BoT checkpoint support currently only supports --arch resnet50")
 
-    bot_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src', 'thirdparty', 'bot')
+    bot_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'thirdparty', 'bot')
     if bot_root not in sys.path:
         sys.path.insert(0, bot_root)
 
