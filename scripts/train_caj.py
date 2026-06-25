@@ -17,6 +17,10 @@ from torch.backends import cudnn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
+src_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src')
+if src_root not in sys.path:
+    sys.path.insert(0, src_root)
+
 from caj import datasets
 from caj import models
 from caj.models.cm import ClusterMemory
@@ -63,10 +67,18 @@ def get_train_loader(args, dataset, height, width, batch_size, workers,
             sampler = RandomMultipleGallerySampler(train_set, num_instances)
     else:
         sampler = None
+
+    total_samples = len(sampler) if sampler is not None else len(train_set)
+    drop_last = True
+    if total_samples < batch_size:
+        drop_last = False
+        print("Warning: train set size ({}) is smaller than batch_size ({}). "
+              "Setting drop_last=False to prevent empty dataloader.".format(total_samples, batch_size))
+
     train_loader = IterLoader(
         DataLoader(Preprocessor(train_set, root=dataset.images_dir, transform=train_transformer),
                    batch_size=batch_size, num_workers=workers, sampler=sampler,
-                   shuffle=not rmgs_flag, pin_memory=True, drop_last=True), length=iters)
+                   shuffle=not rmgs_flag, pin_memory=True, drop_last=drop_last), length=iters)
 
     return train_loader
 
@@ -187,7 +199,6 @@ def main_worker(args):
 
             # select & cluster images as training set of this epochs
             pseudo_labels = cluster.fit_predict(rerank_dist)
-            # pyrefly: ignore [unbound-name]
             del rerank_dist
             gc.collect()
             num_cluster = len(set(pseudo_labels)) - (1 if -1 in pseudo_labels else 0)
@@ -264,8 +275,7 @@ def main_worker(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="CA-Jaccard: Camera-aware Jaccard Distance for Person Re-identification")
     # data
-    parser.add_argument('-d', '--dataset', type=str, default='market1501',
-                        choices=datasets.names())
+    parser.add_argument('-d', '--dataset', type=str, default='market1501')
     parser.add_argument('-b', '--batch-size', type=int, default=256)
     parser.add_argument('-j', '--workers', type=int, default=4)
     parser.add_argument('--height', type=int, default=256, help="input height")
@@ -299,7 +309,7 @@ if __name__ == '__main__':
     parser.add_argument('--temp', type=float, default=0.05,
                         help="temperature for scaling contrastive loss")
     # path
-    working_dir = osp.dirname(osp.abspath(__file__))
+    working_dir = osp.dirname(osp.dirname(osp.abspath(__file__)))
     parser.add_argument('--pretrain-path', type=str, metavar='PATH',
                         default=osp.join(working_dir, 'pretrained_models', 'resnet50-11ad3fa6.pth'),
                         help='local ImageNet pretrained ResNet checkpoint; set empty to use torchvision defaults')

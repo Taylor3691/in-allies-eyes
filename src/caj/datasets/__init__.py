@@ -7,7 +7,7 @@ from .msmt17 import MSMT17
 # from .personx import PersonX
 # from .veri import VeRi
 # from .dukemtmcreid import DukeMTMCreID
-from .grid import GRID
+from .cuhk03 import CUHK03
 
 __factory = {
     'market1501': Market1501,
@@ -15,7 +15,7 @@ __factory = {
     # 'personx': PersonX,
     # 'veri': VeRi,
     # 'dukemtmcreid': DukeMTMCreID,
-    'grid': GRID
+    'cuhk03': CUHK03
 }
 
 
@@ -41,18 +41,12 @@ def create(name, root, *args, **kwargs):
     download : bool, optional
         If True, will download the dataset. Default: False
     """
-    if name.startswith('grid'):
-        if name == 'grid_custom':
-            split_id = 'custom'
-        elif '_' in name:
-            split_id = int(name.split('_')[1])
-        else:
-            split_id = 0
-        # Normalize the root path if it ends with grid_X
+    if name.startswith('cuhk03'):
+        cuhk03_labeled = 'labeled' in name
         basename = osp.basename(root)
-        if basename.startswith('grid'):
-            root = osp.join(osp.dirname(root), 'grid')
-        return GRID(root, split_id=split_id, *args, **kwargs)
+        if basename.startswith('cuhk03'):
+            root = osp.join(osp.dirname(root), 'cuhk03')
+        return CUHK03(root, cuhk03_labeled=cuhk03_labeled, *args, **kwargs)
 
     if name not in __factory:
         raise KeyError("Unknown dataset:", name)

@@ -4,9 +4,6 @@ import os.path as osp
 import random
 import numpy as np
 import sys
-src_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src')
-if src_root not in sys.path:
-    sys.path.insert(0, src_root)
 from collections import OrderedDict
 
 import torch
@@ -14,6 +11,10 @@ from torch import nn
 from torch.nn import functional as F
 from torch.backends import cudnn
 from torch.utils.data import DataLoader
+
+src_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src')
+if src_root not in sys.path:
+    sys.path.insert(0, src_root)
 
 from caj import datasets
 from caj import models
@@ -83,7 +84,7 @@ def build_bot_model(args, num_classes):
     if args.arch != 'resnet50':
         raise ValueError("BoT checkpoint support currently only supports --arch resnet50")
 
-    bot_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src', 'thirdparty', 'bot')
+    bot_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'thirdparty', 'bot')
     if bot_root not in sys.path:
         sys.path.insert(0, bot_root)
 
@@ -220,8 +221,7 @@ if __name__ == '__main__':
     parser.add_argument('--test-source', action='store_true',
                         help="test on the source domain")
     parser.add_argument('--seed', type=int, default=1)
-    # path
-    working_dir = osp.dirname(osp.abspath(__file__))
+    working_dir = osp.dirname(osp.dirname(osp.abspath(__file__)))
     parser.add_argument('--data-dir', type=str, metavar='PATH',
                         default='data')
     parser.add_argument('--logs-dir', type=str, metavar='PATH', default='',

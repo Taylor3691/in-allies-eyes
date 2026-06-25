@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 import argparse
+import sys
+import os.path as osp
 from pathlib import Path
 
-from .experiment_utils import (
+# Add scripts directory to path to enable direct import of experiment_utils
+scripts_dir = osp.dirname(osp.abspath(__file__))
+if scripts_dir not in sys.path:
+    sys.path.insert(0, scripts_dir)
+
+from experiment_utils import (
     DATASET_DEFAULTS,
     append_csv,
     ensure_dataset,
@@ -26,7 +33,8 @@ def parse_k2_pairs(value):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Fig. 4 parameter-analysis commands")
-    parser.add_argument("--dataset", choices=DATASET_DEFAULTS.keys(), default="market1501")
+    parser.add_argument("--dataset", default="market1501",
+                        help="dataset name (market1501, msmt17, or cuhk03 splits e.g. cuhk03, cuhk03_labeled)")
     parser.add_argument("--scene", choices=["clustering", "reranking", "both"], default="clustering")
     parser.add_argument("--sweep", choices=["k1-intra", "k1-inter", "k2", "all"], default="all")
     parser.add_argument("--k1-intra-values", default="1,5,10,15,20,25,40")
@@ -41,14 +49,15 @@ def parse_args():
                         help="BoT BNNeck feature used by test.py for re-ranking")
     parser.add_argument("--bot-no-feat-norm", action="store_true",
                         help="disable L2 normalization of BoT test features")
-    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="Override batch size (default: per-dataset from DATASET_DEFAULTS)")
     parser.add_argument(
         "--num-instances",
         type=int,
         default=None,
         help=(
-            "Override train_caj.py --num-instances for clustering scene. "
-            "Smaller values (e.g. 4 or 8) work better with small batch sizes on low-VRAM GPUs."
+            "Override train_caj.py --num-instances for clustering scene "
+            "(default: per-dataset from DATASET_DEFAULTS)."
         ),
     )
     parser.add_argument("--workers", type=int, default=4)
@@ -65,8 +74,9 @@ def clustering_command(args, sweep_name, label, extra_flags):
     defaults = DATASET_DEFAULTS[args.dataset]
     logs_dir = Path(args.logs_root) / "clustering" / args.dataset / sweep_name / label
     iters = defaults["iters"] if args.iters is None else args.iters
-    epochs_flags = [] if args.epochs is None else ["--epochs", args.epochs]
-    num_instances_flags = [] if args.num_instances is None else ["--num-instances", args.num_instances]
+    batch_size = args.batch_size if args.batch_size is not None else defaults["batch_size"]
+    epochs = args.epochs if args.epochs is not None else defaults["epochs"]
+    num_instances = args.num_instances if args.num_instances is not None else defaults["num_instances"]
     return python_cmd(
         "train_caj.py",
         "-d", args.dataset,
@@ -76,12 +86,12 @@ def clustering_command(args, sweep_name, label, extra_flags):
         "--iters", iters,
         "--height", defaults["height"],
         "--width", defaults["width"],
-        "-b", args.batch_size,
+        "-b", batch_size,
+        "--epochs", epochs,
+        "--num-instances", num_instances,
         "-j", args.workers,
         "--jaccard-memory", args.jaccard_memory,
         "--ckrnns", "--clqe",
-        *epochs_flags,
-        *num_instances_flags,
         *extra_flags,
     ), logs_dir
 
@@ -89,6 +99,7 @@ def clustering_command(args, sweep_name, label, extra_flags):
 def rerank_command(args, sweep_name, label, extra_flags):
     defaults = DATASET_DEFAULTS[args.dataset]
     logs_dir = Path(args.logs_root) / "reranking" / args.dataset / sweep_name / label
+    batch_size = args.batch_size if args.batch_size is not None else defaults["batch_size"]
     cmd = python_cmd(
         "test.py",
         "-d", args.dataset,
@@ -99,7 +110,7 @@ def rerank_command(args, sweep_name, label, extra_flags):
         "--bot-neck-feat", args.bot_neck_feat,
         "--height", defaults["height"],
         "--width", defaults["width"],
-        "-b", args.batch_size,
+        "-b", batch_size,
         "-j", args.workers,
         "--rerank", "--ckrnns", "--clqe",
         *extra_flags,

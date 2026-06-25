@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 import argparse
+import sys
+import os.path as osp
 from pathlib import Path
 
-from .experiment_utils import (
+# Add scripts directory to path to enable direct import of experiment_utils
+scripts_dir = osp.dirname(osp.abspath(__file__))
+if scripts_dir not in sys.path:
+    sys.path.insert(0, scripts_dir)
+
+from experiment_utils import (
     DATASET_DEFAULTS,
     append_csv,
     ensure_dataset,
@@ -19,7 +26,8 @@ RERANK_VARIANTS = ["baseline", "ckrnns", "clqe", "caj"]
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Tab. 3 ablation commands")
-    parser.add_argument("--dataset", choices=DATASET_DEFAULTS.keys(), default="market1501")
+    parser.add_argument("--dataset", default="market1501",
+                        help="dataset name (market1501, msmt17, or cuhk03 splits e.g. cuhk03, cuhk03_labeled)")
     parser.add_argument("--scene", choices=["clustering", "reranking", "both"], default="clustering")
     parser.add_argument("--variants", nargs="+", default=None)
     parser.add_argument("--data-dir", default="data")
@@ -35,7 +43,12 @@ def parse_args():
                         help="BoT BNNeck feature used by test.py for re-ranking")
     parser.add_argument("--bot-no-feat-norm", action="store_true",
                         help="disable L2 normalization of BoT test features")
-    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="Override batch size (default: per-dataset from DATASET_DEFAULTS)")
+    parser.add_argument("--epochs", type=int, default=None,
+                        help="Override training epochs (default: per-dataset from DATASET_DEFAULTS)")
+    parser.add_argument("--num-instances", type=int, default=None,
+                        help="Override num instances per identity (default: per-dataset from DATASET_DEFAULTS)")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--jaccard-memory", choices=["auto", "dense", "sparse"], default="auto",
                         help="memory strategy for clustering Jaccard distance")
@@ -68,6 +81,9 @@ def clustering_command(args, variant):
             "-j", args.workers,
         ), logs_dir, logs_dir / "log_test.txt"
 
+    batch_size = args.batch_size if args.batch_size is not None else defaults["batch_size"]
+    epochs = args.epochs if args.epochs is not None else defaults["epochs"]
+    num_instances = args.num_instances if args.num_instances is not None else defaults["num_instances"]
     analysis_file = logs_dir / "neighbor_analysis.csv"
     return python_cmd(
         "train_caj.py",
@@ -78,7 +94,9 @@ def clustering_command(args, variant):
         "--iters", defaults["iters"],
         "--height", defaults["height"],
         "--width", defaults["width"],
-        "-b", args.batch_size,
+        "-b", batch_size,
+        "--epochs", epochs,
+        "--num-instances", num_instances,
         "-j", args.workers,
         "--jaccard-memory", args.jaccard_memory,
         "--neighbor-analysis",
@@ -90,6 +108,7 @@ def clustering_command(args, variant):
 def rerank_command(args, variant):
     defaults = DATASET_DEFAULTS[args.dataset]
     logs_dir = Path(args.logs_root) / "reranking" / args.dataset / variant
+    batch_size = args.batch_size if args.batch_size is not None else defaults["batch_size"]
     cmd = python_cmd(
         "test.py",
         "-d", args.dataset,
@@ -100,7 +119,7 @@ def rerank_command(args, variant):
         "--bot-neck-feat", args.bot_neck_feat,
         "--height", defaults["height"],
         "--width", defaults["width"],
-        "-b", args.batch_size,
+        "-b", batch_size,
         "-j", args.workers,
     )
     if args.bot_no_feat_norm:

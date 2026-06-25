@@ -27,18 +27,16 @@ DATASETS = {
         "subdir": "msmt17",
         "expected": "MSMT17_V1",
     },
-    "grid": {
-        "url": "https://personal.ie.cuhk.edu.hk/~ccloy/files/datasets/underground_reid.zip",
-        "archive": "underground_reid.zip",
-        "subdir": "grid",
-        "expected": "underground_reid",
+    "cuhk03": {
+        "subdir": "cuhk03",
+        "expected": "cuhk03_release",
     },
 }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Download and extract Market-1501, MSMT17, and GRID into the data directory."
+        description="Download and extract Market-1501, MSMT17, and CUHK03 into the data directory."
     )
     parser.add_argument(
         "datasets",
@@ -158,16 +156,90 @@ def extract_zip(archive_path: Path, destination_dir: Path, force: bool) -> None:
         zf.extractall(destination_dir)
 
 
+def handle_cuhk03(dataset_root: Path, force: bool) -> None:
+    # 1. Search in /kaggle/input
+    kaggle_input = Path("/kaggle/input")
+    attached_path = None
+    if kaggle_input.is_dir():
+        for candidate in kaggle_input.glob("**/cuhk-03.mat"):
+            if candidate.parent.name == "cuhk03_release":
+                attached_path = candidate.parent.parent
+                break
+            elif candidate.name == "cuhk-03.mat":
+                attached_path = candidate.parent
+                break
+
+    if attached_path is not None:
+        print(f"Found attached CUHK03 dataset on Kaggle at: {attached_path}")
+        if dataset_root.exists() or dataset_root.is_symlink():
+            if not force:
+                print(f"Skipping: destination {dataset_root} already exists.")
+                return
+            if dataset_root.is_symlink():
+                dataset_root.unlink()
+            else:
+                shutil.rmtree(dataset_root)
+
+        dataset_root.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            dataset_root.symlink_to(attached_path, target_is_directory=True)
+            print(f"Created symlink: {dataset_root} -> {attached_path}")
+        except OSError as exc:
+            print(f"Failed to create symlink: {exc}. Copying instead...")
+            shutil.copytree(attached_path, dataset_root)
+            print(f"Copied dataset to: {dataset_root}")
+        return
+
+    # 2. Local download using kagglehub
+    print("CUHK03 not found in /kaggle/input. Downloading from Kaggle...")
+    try:
+        import kagglehub
+    except ImportError:
+        raise RuntimeError(
+            "kagglehub package is required to download CUHK03 locally. "
+            "Install it using 'pip install kagglehub' and configure your Kaggle credentials."
+        )
+
+    downloaded_dir = Path(kagglehub.dataset_download("priyanagda/cuhk03", force_download=force))
+    print(f"Downloaded CUHK03 to cache: {downloaded_dir}")
+
+    src_dir = downloaded_dir / "archive"
+    if not src_dir.is_dir():
+        src_dir = downloaded_dir
+
+    if dataset_root.exists() or dataset_root.is_symlink():
+        if not force:
+            print(f"Skipping: destination {dataset_root} already exists.")
+            return
+        if dataset_root.is_symlink():
+            dataset_root.unlink()
+        else:
+            shutil.rmtree(dataset_root)
+
+    dataset_root.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        dataset_root.symlink_to(src_dir, target_is_directory=True)
+        print(f"Created symlink: {dataset_root} -> {src_dir}")
+    except OSError:
+        shutil.copytree(src_dir, dataset_root)
+        print(f"Copied dataset to: {dataset_root}")
+
+
 def process_dataset(name: str, args: argparse.Namespace) -> None:
     spec = DATASETS[name]
     dataset_root = args.data_dir / spec["subdir"]
     expected_dir = dataset_root / spec["expected"]
-    download_dir = args.download_dir or args.data_dir / "_downloads"
-    archive_path = download_dir / spec["archive"]
 
     if expected_dir.exists() and not args.force:
         print(f"Skipping {name}: found {expected_dir}")
         return
+
+    if name == "cuhk03":
+        handle_cuhk03(dataset_root, args.force)
+        return
+
+    download_dir = args.download_dir or args.data_dir / "_downloads"
+    archive_path = download_dir / spec["archive"]
 
     download_file(spec["url"], archive_path, force=args.force)
 

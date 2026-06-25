@@ -1,6 +1,6 @@
 # in-allies-eyes
 
-This repository contains a working CA-Jaccard person re-identification setup integrated with a Bag-of-Tricks (BoT) training and testing pipeline. The codebase has been adapted to support running experiments on **Market1501** and the **GRID** dataset (underground Re-ID).
+This repository contains a working CA-Jaccard person re-identification setup integrated with a Bag-of-Tricks (BoT) training and testing pipeline. The codebase has been adapted to support running experiments on **Market1501** and the **CUHK03** dataset.
 
 All commands assume they are run from the repository root with the project environment active.
 
@@ -25,24 +25,26 @@ uv pip install -r requirements.txt
 
 ### Dataset Downloads
 
-This codebase supports downloading and extracting both Market1501 and GRID datasets:
+This codebase supports downloading and extracting both Market1501 and CUHK03 datasets:
 
 ```bash
 # Download and extract Market1501
 python scripts/download_datasets.py market1501
 
-# Download and extract GRID
-python scripts/download_datasets.py grid
+# Download and extract CUHK03
+python scripts/download_datasets.py cuhk03
 ```
 
-By default, archives are stored in `data/_downloads` and extracted to:
+By default, archives are stored in `data/_downloads` and extracted/mapped to:
 - `data/market1501/Market-1501-v15.09.15`
-- `data/grid/underground_reid`
+- `data/cuhk03`
+
+On Kaggle platforms, the downloader automatically detects `/kaggle/input` datasets and symlinks the parent of `cuhk03_release` to `data/cuhk03` directly.
 
 Downloaded archives are removed after successful extraction. Use `--keep-archives` if you want to keep the zip file:
 
 ```bash
-python scripts/download_datasets.py grid --keep-archives
+python scripts/download_datasets.py market1501 --keep-archives
 ```
 
 ### Pretrained Weights
@@ -75,34 +77,16 @@ The following sections are for reproducing the experiments and analyses:
 - **Figure 3**: Neighbor analysis over clustering epochs
 - **Figure 4**: Parameter analysis
 
-### GRID Split Configurations
+### Training BoT on CUHK03
 
-The GRID dataset contains only 1,275 images across 250 paired identities and 775 distractors. The repository supports two split strategies:
+A dedicated CUHK03 configuration file is provided at `thirdparty/bot/configs/softmax_triplet_with_center_cuhk03.yml`. It uses standard settings optimized for CUHK03.
 
-1. **Standard 10-Fold Cross-Validation (`grid_0` to `grid_9`)**:
-   Uses the partitions from the official MATLAB features file (each fold contains 125 train identities, 125 test query/probe identities, and 775 test gallery distractors).
-2. **Custom 80/20 Train/Test Split (`grid_custom`)**:
-   A random partition with a fixed seed (42) that assigns 80% (200) of the paired identities to training (400 images total) and 20% (50) to testing, allowing for slightly larger few-shot training sets.
-
-### Training BoT on GRID
-
-A dedicated GRID configuration file is provided at `src/thirdparty/bot/configs/softmax_triplet_with_center_grid.yml`. It has been optimized for GRID's smaller scale (batch size 32, num instances 2, 80 training epochs, and learning rate step decays at [30, 55]).
-
-To train the Bag-of-Tricks model on the custom 80/20 GRID split:
+To train the Bag-of-Tricks model on CUHK03:
 
 ```bash
-cd src/thirdparty/bot
+cd thirdparty/bot
 python tools/train.py \
-  --config_file configs/softmax_triplet_with_center_grid.yml
-```
-
-To train on a specific standard fold (e.g. fold 0):
-
-```bash
-cd src/thirdparty/bot
-python tools/train.py \
-  --config_file configs/softmax_triplet_with_center_grid.yml \
-  DATASETS.NAMES "('grid_0')"
+  --config_file configs/softmax_triplet_with_center_cuhk03.yml
 ```
 
 The resulting checkpoint can be evaluated using the CAJ testing pipeline by passing `--checkpoint-format bot`.
@@ -119,11 +103,11 @@ python scripts/run_tab3_ablation.py \
   --scene clustering
 ```
 
-Run the clustering ablation for GRID:
+Run the clustering ablation for CUHK03:
 
 ```bash
 python scripts/run_tab3_ablation.py \
-  --dataset grid \
+  --dataset cuhk03 \
   --scene clustering
 ```
 
@@ -157,8 +141,8 @@ Neighbor analysis has been merged into the Table 3 Clustering Ablation script (`
 # Market1501
 python scripts/run_tab3_ablation.py --dataset market1501 --scene clustering
 
-# GRID
-python scripts/run_tab3_ablation.py --dataset grid --scene clustering
+# CUHK03
+python scripts/run_tab3_ablation.py --dataset cuhk03 --scene clustering
 ```
 
 ---
@@ -169,7 +153,7 @@ Sweep hyperparameters (`k1-intra`, `k1-inter`, and `k2` variations) to analyze s
 
 ```bash
 python scripts/run_fig4_params.py \
-  --dataset grid \
+  --dataset cuhk03 \
   --scene clustering \
   --sweep all
 ```
