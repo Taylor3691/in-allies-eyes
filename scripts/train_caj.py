@@ -199,7 +199,6 @@ def main_worker(args):
 
             # select & cluster images as training set of this epochs
             pseudo_labels = cluster.fit_predict(rerank_dist)
-            # pyrefly: ignore [unbound-name]
             del rerank_dist
             gc.collect()
             num_cluster = len(set(pseudo_labels)) - (1 if -1 in pseudo_labels else 0)
