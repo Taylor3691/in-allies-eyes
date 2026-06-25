@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 import urllib.error
 import urllib.request
-import zipfile
 from pathlib import Path
 
 
@@ -17,59 +15,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RESNET50_URL = "https://download.pytorch.org/models/resnet50-11ad3fa6.pth"
 RESNET50_FILE = "resnet50-11ad3fa6.pth"
 
-MARKET_BOT_FILE = "market_resnet50_model_120_rank1_945.pth"
-MARKET_BOT_ARCHIVE = "market_resnet50_model_120_rank1_945.zip"
-MARKET_BOT_PART_IDS = [
-    "1cYQJ0_Kv-oPbeh0nwJPQUMoUHlOhZ1wb",
-    "1AdVqIyKgH7wsny91ujeTAR62bidb9D3b",
-    "1gHaSyepsiL0fFtWkygpSkwh-7eHkAuSP",
-    "1YpocBA0H2o3Ss20L7ATpHhUP-74lcphT",
-    "1bo5seGkArfZGDpFsuY_wCGN_6fWVZxDO",
-    "18V08ix0qMjns_tokkgrlT-WDZKVJWHay",
-    "1MOncX_Rz542ggbs0E2lqYLfMQMAcUwfx",
-    "1VHnJRAalowWZO2IDmX4vcoVk56iSaZNf",
-    "19yxxdgzlSMMDio2atKS_KJQQg3G6rXMT",
-    "1pLcCjG13F4jnHyTFpK1L1w2PrJX8l7Mc",
-    "1_y5f7HruaoTY_OA-bsqAeODV7mveEycM",
-    "1Z82xJWmhcviZttgpEEv_Q8eJ2197sjxh",
-    "1lOB_ZViXII_yHJx1AsNs1aOSZxs6Tk1p",
-    "1hi_HHQwAILyTShcdOiEy97ibpLlaf3Z4",
-    "1bF0BHuCJ_MJ42K2Tj38KwndttJbhOJaE",
-    "1GZChLuO43dPvuPLkTqxA7kcmnCgdqH5P",
-    "1l6qfaoiiIQYM_NyKtFiqzDs0Gk2vU_lC",
-    "1UFNE0fwD5ERHakCnHXR0eCzWdFrzkt9N",
-    "1O0ZKcKb-5B-5O8bHiWli87LITO9z5kQK",
-    "1hhckvIwQlZRzYmFZfapUVMf4jbk7UT40",
-    "1VFyk3lhDR0pkq3uNZy8fEwCAyRujpvGO",
-    "1O-23PKovG1ZXcsDk8mKh21AjAQEaE059",
-    "17p_44HsoqSPyEuoiN2xeiUuoIGYQ3HvQ",
-    "1O-_jJ-c2Zmq1SdOSyVhE0-K-nG_vZL0N",
-    "1KTtUYE9dKLNVaJboLjxDeBoWIEcqUw_S",
-    "1iXjDcGMxbH_MZz3986iGmmyrHSUT3RIe",
-    "1jmE0c9N00PHe1-JsviDxR2ggamSznBPt",
-    "12aZ_27OF8HfnLN3ge8vPxvHwWK1zEMNP",
-    "1eZPLvniF2xhSl9QvIQg39OU2VEUeQ7ie",
-    "1wdf7uqh5_gxyctmaF-eM_udyZgKlxjHZ",
-    "1UBPdfoX5ipniF-XYj7U9tGrxGx-mfvS9",
-    "1tmlaMwB7D0naKie-R9BJK0_R-n6pIsj8",
-    "1v0JoaUfesjo19JCgDRwZv9Q4S1Q40scP",
-    "1u3N1ohy8tPKbBjujAO6LnHoAFqiGxEc5",
-    "1OZCqI6EQrdYGN1x5gIUwWsY-jvQMgbC3",
-    "1qS07fdPIIRWB5LqpHN6uFqaNcxaJgj5r",
-    "1BVfd_AnMgur7TA63pY7Aemy7XtzxqhiO",
-    "1QocapaIIwpuG6suaMJ9ykJCtIODucX9X",
-    "1l7li_Cd4zXSkQhXcjCVPlyVaViKohASs",
-    "1cSeVy_uLVSra8RtAcVBh7qRBx8cR5IDF",
-    "1vFbbXabj-EQrXlRxzvqHEUjGnBWK-rFd",
-    "1NaGcTDCcWVjGxtwDT35KhAwAwE3k_Re0",
-    "1td0AEiZsIJj63mnsZMjiMZsae8BOi3pC",
-    "1ri4A_yvGLflxWNYBnaf_cLNf0p9GewiX",
-    "16Pmd80AALhqUMvlhRoF7ayAKs5B-vgUJ",
-]
-
 GOOGLE_DRIVE_FILES = {
-    "cc-market": ("CC_market1501_81.0.tar", "1PQX3B7w37z-DX2_C5lZS4l3hZF00lDzK"),
-    "caj-market": ("CC+CAJ_market1501_84.8.tar", "1YXNrdxrpKFa-0MlFaX_IhDLuTANt0rOj"),
+    "cc-market": ("CC_market1501_81.0.tar", "1Jza_z3tNv5cCtXan576qQsPfpB4tMeF6"),
+    "caj-market": ("CC+CAJ_market1501_85.1.tar", "1Id7OplbL8ZpX6mw0wu847z7BoOuE2rub"),
+    "market-bot": ("market_resnet50_model_120_rank1_945.pth", "14a2NLjFZMu1RmSKrljgytfhJpe1rCti7"),
+    "cc-cuhk03": ("CC_cuhk03_6.4.tar", "1Dw0tfUzkgJ3uKqKsTKqwppSffDcScOZV"),
+    "caj-cuhk03": ("CC+CAJ_cuhk03_61.6.tar", "1gUdgbYocUEVNOBQqaVKcF2PpbmS2stbM"),
+    "cuhk03-bot": ("cuhk03_resnet50_model_120_rank1_608.pth", "1yBVUrmhUtmEDeh51-m0M772MYY6afzaD"),
 }
 
 
@@ -80,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "models",
         nargs="*",
-        choices=["all", "demo", "resnet50", "market-bot", "cc-market", "caj-market"],
+        choices=["all", "demo", "resnet50", *GOOGLE_DRIVE_FILES.keys()],
         default=None,
         help="Model weights to download. Defaults to all. Use 'demo' for the demo app weights.",
     )
@@ -91,31 +43,20 @@ def parse_args() -> argparse.Namespace:
         help="Directory for final .pth files. Defaults to ./pretrained_models.",
     )
     parser.add_argument(
-        "--download-dir",
-        type=Path,
-        default=None,
-        help="Directory for temporary archives. Defaults to <output-dir>/_downloads.",
-    )
-    parser.add_argument(
         "--force",
         action="store_true",
-        help="Download and extract even if the expected .pth file exists.",
-    )
-    parser.add_argument(
-        "--keep-archives",
-        action="store_true",
-        help="Keep downloaded zip parts and the combined zip after extraction.",
+        help="Download even if the expected file exists.",
     )
     return parser.parse_args()
 
 
 def selected_models(names: list[str] | None) -> list[str]:
     if not names or "all" in names:
-        return ["cc-market", "caj-market", "market-bot", "resnet50"]
+        return ["resnet50", *GOOGLE_DRIVE_FILES.keys()]
     selected = []
     for name in names:
         if name == "demo":
-            selected.extend(["cc-market", "caj-market", "market-bot"])
+            selected.extend(GOOGLE_DRIVE_FILES.keys())
         else:
             selected.append(name)
     return selected
@@ -191,30 +132,6 @@ def download_resnet50(output_dir: Path, force: bool) -> None:
     print(f"Ready: {destination}")
 
 
-def download_market_bot(output_dir: Path, download_dir: Path, force: bool, keep_archives: bool) -> None:
-    expected = output_dir / MARKET_BOT_FILE
-    if expected.exists() and not force:
-        print(f"Skipping market-bot: found {expected}")
-        return
-
-    parts_dir = download_dir / "market-bot"
-    part_paths = []
-    for index, file_id in enumerate(MARKET_BOT_PART_IDS, start=1):
-        part_path = parts_dir / f"{MARKET_BOT_ARCHIVE}.{index:03d}"
-        download_file(google_drive_download_url(file_id), part_path, force=force)
-        part_paths.append(part_path)
-
-    combined_zip = download_dir / MARKET_BOT_ARCHIVE
-    combine_parts(part_paths, combined_zip, force=force)
-    extract_zip(combined_zip, output_dir)
-    ensure_expected_file(output_dir, MARKET_BOT_FILE)
-
-    if not keep_archives:
-        cleanup_market_bot_archives(parts_dir, combined_zip, download_dir)
-
-    print(f"Ready: {expected}")
-
-
 def download_google_drive_file(model_name: str, output_dir: Path, force: bool) -> None:
     filename, file_id = GOOGLE_DRIVE_FILES[model_name]
     destination = output_dir / filename
@@ -225,102 +142,14 @@ def download_google_drive_file(model_name: str, output_dir: Path, force: bool) -
     print(f"Ready: {destination}")
 
 
-def combine_parts(part_paths: list[Path], destination: Path, force: bool) -> None:
-    if destination.exists() and not force:
-        print(f"Using existing combined archive: {destination}")
-        return
-
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    tmp_destination = destination.with_suffix(destination.suffix + ".part")
-    print(f"Combining {len(part_paths)} parts -> {destination}")
-    with tmp_destination.open("wb") as out:
-        for part_path in part_paths:
-            with part_path.open("rb") as part:
-                shutil.copyfileobj(part, out, length=1024 * 1024)
-    tmp_destination.replace(destination)
-
-
-def extract_zip(archive_path: Path, output_dir: Path) -> None:
-    if not zipfile.is_zipfile(archive_path):
-        raise RuntimeError(
-            f"{archive_path} is not a valid zip file. For Google Drive, this usually "
-            "means one of the downloaded parts is an HTML confirmation/error page."
-        )
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Extracting {archive_path} -> {output_dir}")
-    with zipfile.ZipFile(archive_path) as zf:
-        safe_extract(zf, output_dir)
-
-
-def safe_extract(zf: zipfile.ZipFile, output_dir: Path) -> None:
-    output_root = output_dir.resolve()
-    for member in zf.infolist():
-        target = (output_dir / member.filename).resolve()
-        if output_root not in (target, *target.parents):
-            raise RuntimeError(f"Refusing to extract unsafe path: {member.filename}")
-    zf.extractall(output_dir)
-
-
-def ensure_expected_file(output_dir: Path, filename: str) -> None:
-    expected = output_dir / filename
-    if expected.exists():
-        return
-
-    matches = list(output_dir.rglob(filename))
-    if len(matches) == 1:
-        matches[0].replace(expected)
-        cleanup_empty_parents(matches[0].parent, stop_at=output_dir)
-        return
-
-    raise RuntimeError(f"Extraction completed, but expected file was not found: {expected}")
-
-
-def cleanup_empty_parents(path: Path, stop_at: Path) -> None:
-    stop_at = stop_at.resolve()
-    current = path.resolve()
-    while current != stop_at and stop_at in current.parents:
-        try:
-            current.rmdir()
-        except OSError:
-            break
-        current = current.parent
-
-
-def cleanup_market_bot_archives(parts_dir: Path, combined_zip: Path, download_dir: Path) -> None:
-    combined_zip.unlink(missing_ok=True)
-    shutil.rmtree(parts_dir, ignore_errors=True)
-    try_remove_empty_dir(download_dir)
-    print("Removed market-bot zip archives.")
-
-
-def try_remove_empty_dir(path: Path) -> None:
-    try:
-        path.rmdir()
-    except OSError:
-        return
-
-
 def main() -> int:
     args = parse_args()
     output_dir = args.output_dir.expanduser().resolve()
-    download_dir = (
-        args.download_dir.expanduser().resolve()
-        if args.download_dir is not None
-        else output_dir / "_downloads"
-    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for model in selected_models(args.models):
         if model == "resnet50":
             download_resnet50(output_dir, force=args.force)
-        elif model == "market-bot":
-            download_market_bot(
-                output_dir,
-                download_dir,
-                force=args.force,
-                keep_archives=args.keep_archives,
-            )
         elif model in GOOGLE_DRIVE_FILES:
             download_google_drive_file(model, output_dir, force=args.force)
     return 0
