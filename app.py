@@ -1,22 +1,185 @@
 import sys
 import os
+import cv2
 import gradio as gr
 import numpy as np
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from Kalman_filter import KalmanTracker
 
-# Stub callbacks for initial visual testing
+# Initialize OpenCV face detector
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+# Global Kalman Tracker and State variables
+tracker = KalmanTracker()
+latest_frame = None
+missing_frames_counter = 0
+camera_active = False
+use_kalman_global = False
+
+def update_kalman_state(val):
+    global use_kalman_global
+    use_kalman_global = val
+
+# Stub callbacks for Re-ID Tab searches and Comparisons
 def search_gallery(query_img, use_caj, top_k):
-    # Placeholder: Returns an empty list of images for baseline and final results
     return [], []
 
 def run_comparison(raw_img, kalman_img):
-    # Placeholder: Returns empty lists for the 4 comparison modes
     return [], [], [], []
 
 def reset_tracker():
+    global tracker, missing_frames_counter
+    tracker = KalmanTracker()
+    missing_frames_counter = 0
     return "Missing", "Predict only"
+
+def toggle_camera(use_kf):
+    global camera_active, latest_frame, missing_frames_counter, use_kalman_global
+    
+    if camera_active:
+        # Stop the camera loop
+        camera_active = False
+        yield None, "Start Camera", "Missing", "Predict only"
+        return
+        
+    camera_active = True
+    use_kalman_global = use_kf
+    # Open direct connection to system webcam
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        camera_active = False
+        yield None, "Start Camera", "Camera Offline", "Predict only"
+        return
+        
+    # Configure webcam stream properties for fast processing
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    
+    # Stream frames directly in a loop using Python generators
+    while camera_active:
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        # Flip frame horizontally for a mirrored preview
+        frame = cv2.flip(frame, 1)
+        
+        # Store latest frame as RGB for cropping
+        latest_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Detection preprocessing
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        raw_bbox = None
+        
+        if len(faces) > 0:
+            # Pick largest detection
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            x, y, w, h = faces[0]
+            raw_bbox = (int(x), int(y), int(w), int(h))
+            missing_frames_counter = 0
+        else:
+            missing_frames_counter += 1
+            
+        # Run Kalman state matrices predictions and corrections
+        if use_kalman_global:
+            tracker.predict()
+            if raw_bbox is not None:
+                tracker.update(raw_bbox)
+            else:
+                if missing_frames_counter > 30:
+                    tracker.state = None
+                    tracker.status = "Missing"
+                    tracker.mode = "Predict only"
+        else:
+            if raw_bbox is not None:
+                tracker.state = None
+                tracker.update(raw_bbox)
+                tracker.status = "Found"
+                tracker.mode = "Predict only"
+            else:
+                tracker.state = None
+                tracker.status = "Missing"
+                tracker.mode = "Predict only"
+                
+        # Draw target overlays
+        output_frame = frame.copy()
+        
+        if raw_bbox is not None:
+            rx, ry, rw, rh = raw_bbox
+            cv2.rectangle(output_frame, (rx, ry), (rx + rw, ry + rh), (0, 0, 255), 2)  # Red raw box
+            
+        if use_kalman_global and tracker.state is not None:
+            kf_rect = tracker.get_rect()
+            if kf_rect is not None:
+                kx, ky, kw, kh = kf_rect
+                fh, fw_img, _ = frame.shape
+                kx = max(0, min(kx, fw_img))
+                ky = max(0, min(ky, fh))
+                kw = max(1, min(kw, fw_img - kx))
+                kh = max(1, min(kh, fh - ky))
+                cv2.rectangle(output_frame, (kx, ky), (kx + kw, ky + kh), (0, 255, 0), 2)  # Green Kalman box
+                
+        # Convert output to RGB for display in Gradio UI
+        output_frame_rgb = cv2.cvtColor(output_frame, cv2.COLOR_BGR2RGB)
+        yield output_frame_rgb, "Stop Camera", tracker.status, tracker.mode
+        
+        # Yield at ~30 FPS to ensure smooth display and direct thread control
+        time.sleep(0.03)
+        
+    cap.release()
+    yield None, "Start Camera", "Missing", "Predict only"
+
+def capture_query(use_kf, camera_id):
+    global latest_frame
+    if latest_frame is None:
+        return None, "No active frame captured", "N/A", "N/A"
+
+    # Convert RGB frame back to BGR for OpenCV processing
+    latest_bgr = cv2.cvtColor(latest_frame, cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(latest_bgr, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    raw_bbox = None
+
+    if len(faces) > 0:
+        faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+        raw_bbox = faces[0]
+
+    crop = None
+    source = "None"
+
+    if use_kf:
+        kf_rect = tracker.get_rect()
+        if kf_rect is not None:
+            kx, ky, kw, kh = kf_rect
+            fh, fw_img, _ = latest_bgr.shape
+            kx = max(0, min(kx, fw_img))
+            ky = max(0, min(ky, fh))
+            kw = max(1, min(kw, fw_img - kx))
+            kh = max(1, min(kh, fh - ky))
+            crop = latest_bgr[ky:ky+kh, kx:kx+kw]
+            source = "Kalman bbox"
+    else:
+        if raw_bbox is not None:
+            x, y, w, h = raw_bbox
+            crop = latest_bgr[y:y+h, x:x+w]
+            source = "Raw bbox"
+
+    if crop is None or crop.size == 0:
+        return None, "No target found to crop", "N/A", "N/A"
+
+    crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+    quality = f"Contrast: {int(np.std(crop_rgb))}"
+
+    # Save to disk
+    save_dir = "captured/kalman" if use_kf else "captured/original"
+    os.makedirs(save_dir, exist_ok=True)
+    filename = f"crop_{int(time.time())}.png"
+    cv2.imwrite(os.path.join(save_dir, filename), crop)
+
+    return crop_rgb, source, camera_id, quality
 
 # Gradio Blocks layout initialization
 with gr.Blocks(title="Person Re-ID Demo App") as demo:
@@ -30,11 +193,14 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
         with gr.Row():
             with gr.Column(scale=2):
                 gr.Markdown("#### Webcam Video Stream")
-                # Placeholder image representing a live camera feed
-                webcam_placeholder = gr.Image(label="Live Video Feed (Webcam Stream Placeholder)")
+                # Single display for output; direct camera streaming loop
+                webcam_placeholder = gr.Image(label="Live Video Feed (Webcam Stream)")
                 
             with gr.Column(scale=1):
                 gr.Markdown("#### Bounding Box & Tracking Controls")
+                # Custom toggle button outside the frame
+                btn_toggle_cam = gr.Button("Start Camera", variant="secondary")
+                
                 use_kalman = gr.Checkbox(label="Use Kalman Filter", value=False)
                 det_status = gr.Label(value="Missing", label="Detector Status")
                 kf_mode = gr.Label(value="Predict only", label="Kalman Mode")
@@ -100,8 +266,17 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
             mode3_out = gr.Gallery(label="Mode 3: Kalman OFF | CA-Jaccard ON")
             mode4_out = gr.Gallery(label="Mode 4: Kalman ON  | CA-Jaccard ON")
 
-    # Connect stub event handlers
+    # Connect event handlers
+    use_kalman.change(fn=update_kalman_state, inputs=[use_kalman], outputs=[])
+    btn_toggle_cam.click(
+        fn=toggle_camera,
+        inputs=[use_kalman],
+        outputs=[webcam_placeholder, btn_toggle_cam, det_status, kf_mode],
+        concurrency_limit=None,
+        trigger_mode="multiple"
+    )
     btn_reset.click(fn=reset_tracker, inputs=[], outputs=[det_status, kf_mode])
+    btn_capture.click(fn=capture_query, inputs=[use_kalman, cam_id], outputs=[capture_preview, capture_source, capture_cam_id, frame_quality])
     btn_search.click(fn=search_gallery, inputs=[query_upload, use_caj_ranking, top_k_selector], outputs=[baseline_gallery, final_gallery])
     btn_run_compare.click(fn=run_comparison, inputs=[raw_query_img, kalman_query_img], outputs=[mode1_out, mode2_out, mode3_out, mode4_out])
 
