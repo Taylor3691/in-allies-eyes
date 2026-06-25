@@ -27,7 +27,7 @@ RERANK_VARIANTS = ["baseline", "ckrnns", "clqe", "caj"]
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Tab. 3 ablation commands")
     parser.add_argument("--dataset", default="market1501",
-                        help="dataset name (market1501, msmt17, or grid splits e.g. grid_custom, grid_0)")
+                        help="dataset name (market1501, msmt17, or cuhk03 splits e.g. cuhk03, cuhk03_labeled)")
     parser.add_argument("--scene", choices=["clustering", "reranking", "both"], default="clustering")
     parser.add_argument("--variants", nargs="+", default=None)
     parser.add_argument("--data-dir", default="data")

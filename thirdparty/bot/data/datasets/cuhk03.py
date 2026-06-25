@@ -7,7 +7,7 @@
 import h5py
 import os.path as osp
 from scipy.io import loadmat
-from scipy.misc import imsave
+from PIL import Image
 
 from utils.iotools import mkdir_if_missing, write_json, read_json
 from .bases import BaseImageDataset
@@ -67,9 +67,19 @@ class CUHK03(BaseImageDataset):
         split = splits[split_id]
         print("Split index = {}".format(split_id))
 
-        train = split['train']
-        query = split['query']
-        gallery = split['gallery']
+        def _correct_paths(dataset_list, target_dir):
+            corrected = []
+            for item in dataset_list:
+                img_path, pid, camid = item
+                img_path = img_path.replace('\\', '/')
+                img_name = osp.basename(img_path)
+                corrected.append((osp.join(target_dir, img_name), pid, camid))
+            return corrected
+
+        imgs_dir = self.imgs_labeled_dir if cuhk03_labeled else self.imgs_detected_dir
+        train = _correct_paths(split['train'], imgs_dir)
+        query = _correct_paths(split['query'], imgs_dir)
+        gallery = _correct_paths(split['gallery'], imgs_dir)
 
         if verbose:
             print("=> CUHK03 ({}) loaded".format(image_type))
@@ -137,7 +147,7 @@ class CUHK03(BaseImageDataset):
                 img_name = '{:01d}_{:03d}_{:01d}_{:02d}.png'.format(campid + 1, pid + 1, viewid, imgid + 1)
                 img_path = osp.join(save_dir, img_name)
                 if not osp.isfile(img_path):
-                    imsave(img_path, img)
+                    Image.fromarray(img).save(img_path)
                 img_paths.append(img_path)
             return img_paths
 

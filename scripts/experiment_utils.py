@@ -10,13 +10,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 class DatasetDefaultsDict(dict):
     def __getitem__(self, key):
-        if isinstance(key, str) and key.startswith("grid"):
-            return super().__getitem__("grid")
+        if isinstance(key, str) and key.startswith("cuhk03"):
+            return super().__getitem__("cuhk03")
         return super().__getitem__(key)
 
     def __contains__(self, key):
-        if isinstance(key, str) and key.startswith("grid"):
-            return super().__contains__("grid")
+        if isinstance(key, str) and key.startswith("cuhk03"):
+            return super().__contains__("cuhk03")
         return super().__contains__(key)
 
 
@@ -25,8 +25,8 @@ DATASET_DEFAULTS = DatasetDefaultsDict({
                    "batch_size": 256, "epochs": 50, "num_instances": 16},
     "msmt17": {"eps": 0.6, "iters": 400, "height": 256, "width": 128,
                "batch_size": 256, "epochs": 50, "num_instances": 16},
-    "grid": {"eps": 0.3, "iters": 100, "height": 256, "width": 128,
-             "batch_size": 64, "epochs": 30, "num_instances": 4},
+    "cuhk03": {"eps": 0.4, "iters": 200, "height": 256, "width": 128,
+               "batch_size": 256, "epochs": 50, "num_instances": 16},
 })
 
 

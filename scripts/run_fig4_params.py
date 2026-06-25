@@ -34,7 +34,7 @@ def parse_k2_pairs(value):
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Fig. 4 parameter-analysis commands")
     parser.add_argument("--dataset", default="market1501",
-                        help="dataset name (market1501, msmt17, or grid splits e.g. grid_custom, grid_0)")
+                        help="dataset name (market1501, msmt17, or cuhk03 splits e.g. cuhk03, cuhk03_labeled)")
     parser.add_argument("--scene", choices=["clustering", "reranking", "both"], default="clustering")
     parser.add_argument("--sweep", choices=["k1-intra", "k1-inter", "k2", "all"], default="all")
     parser.add_argument("--k1-intra-values", default="1,5,10,15,20,25,40")
