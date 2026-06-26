@@ -56,28 +56,7 @@ def _bg_load_model():
         checkpoint = load_checkpoint(checkpoint_path)
         raw_state_dict = checkpoint['state_dict']
 
-        from collections import OrderedDict
-        state_dict = OrderedDict()
-        layer_map = {
-            'base.conv1.': 'base.0.',
-            'base.bn1.': 'base.1.',
-            'base.layer1.': 'base.4.',
-            'base.layer2.': 'base.5.',
-            'base.layer3.': 'base.6.',
-            'base.layer4.': 'base.7.',
-            'bottleneck.': 'feat_bn.',
-        }
-        for name, param in raw_state_dict.items():
-            if name.startswith('classifier.'):
-                continue
-            new_name = name
-            for old_prefix, new_prefix in layer_map.items():
-                if name.startswith(old_prefix):
-                    new_name = new_prefix + name[len(old_prefix):]
-                    break
-            state_dict[new_name] = param
-
-        copy_state_dict(state_dict, model.model, strip='module.')
+        copy_state_dict(raw_state_dict, model.model, strip='module.')
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model.to(device)
