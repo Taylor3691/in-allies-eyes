@@ -56,7 +56,7 @@ def selected_models(names: list[str] | None) -> list[str]:
     selected = []
     for name in names:
         if name == "demo":
-            selected.extend(GOOGLE_DRIVE_FILES.keys())
+            selected.extend(["market-bot", "cuhk03-bot"])
         else:
             selected.append(name)
     return selected
