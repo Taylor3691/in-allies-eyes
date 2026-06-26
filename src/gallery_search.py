@@ -1,10 +1,14 @@
 import os
-import sys
 import cv2
 import numpy as np
 from reid_engine import get_reid_model
 from webcam_handler import capture_live_fallback, capture_live_both
 import webcam_handler
+
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CACHE_DIR = os.path.join(REPO_ROOT, ".cache")
+DATA_DIR = os.path.join(REPO_ROOT, "data")
 
 # Global cached gallery data
 cached_gallery_data = None
@@ -71,7 +75,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
 
         # 3. Lazy load gallery features cache
         if cached_gallery_data is None:
-            cache_path = os.path.join(os.path.dirname(__file__), '..', 'market1501_gallery_features.npy')
+            cache_path = os.path.join(CACHE_DIR, 'market1501_gallery_features.npy')
             if not os.path.exists(cache_path):
                 return [("https://via.placeholder.com/150?text=Run+Cache+Script+First", "Cache not found")], [], None
             cached_gallery_data = np.load(cache_path, allow_pickle=True).item()
@@ -184,6 +188,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
         import traceback
         traceback.print_exc()
         return [("https://via.placeholder.com/150", f"Error: {e}")], [], None
+
 
 def run_comparison(raw_img, kalman_img):
     # Fallback to live webcam crops if query images are missing
