@@ -1,6 +1,7 @@
 __pycache__
 .venv
 .vscode
+.cache
 
 /data
 /pretrained_models

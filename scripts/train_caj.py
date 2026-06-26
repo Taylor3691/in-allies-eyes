@@ -17,22 +17,22 @@ from torch.backends import cudnn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
-src_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'src')
-if src_root not in sys.path:
-    sys.path.insert(0, src_root)
+repo_root = osp.dirname(osp.dirname(osp.abspath(__file__)))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
-from caj import datasets
-from caj import models
-from caj.models.cm import ClusterMemory
-from caj.trainers import ClusterContrastTrainer
-from caj.evaluators import Evaluator, extract_features
-from caj.utils.data import IterLoader
-from caj.utils.data import transforms as T
-from caj.utils.data.preprocessor import Preprocessor
-from caj.utils.logging import Logger
-from caj.utils.serialization import load_checkpoint, save_checkpoint
-from caj.utils.caj_rerank import compute_jaccard_distance
-from caj.utils.data.sampler import RandomMultipleGallerySampler, RandomMultipleGallerySamplerNoCam
+from src.caj import datasets
+from src.caj import models
+from src.caj.models.cm import ClusterMemory
+from src.caj.trainers import ClusterContrastTrainer
+from src.caj.evaluators import Evaluator, extract_features
+from src.caj.utils.data import IterLoader
+from src.caj.utils.data import transforms as T
+from src.caj.utils.data.preprocessor import Preprocessor
+from src.caj.utils.logging import Logger
+from src.caj.utils.serialization import load_checkpoint, save_checkpoint
+from src.caj.utils.caj_rerank import compute_jaccard_distance
+from src.caj.utils.data.sampler import RandomMultipleGallerySampler, RandomMultipleGallerySamplerNoCam
 
 start_epoch = best_mAP = 0
 

@@ -4,12 +4,11 @@ import sys
 import os.path as osp
 from pathlib import Path
 
-# Add scripts directory to path to enable direct import of experiment_utils
-scripts_dir = osp.dirname(osp.abspath(__file__))
-if scripts_dir not in sys.path:
-    sys.path.insert(0, scripts_dir)
+repo_root = osp.dirname(osp.dirname(osp.abspath(__file__)))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
-from experiment_utils import (
+from scripts.experiment_utils import (
     DATASET_DEFAULTS,
     append_csv,
     ensure_dataset,
