@@ -1,6 +1,7 @@
 __pycache__
 .venv
 .vscode
+.cache
 
 /data
 /pretrained_models
@@ -8,6 +9,3 @@ __pycache__
 /results
 
 /*.toml
-
-captured/
-market1501_gallery_features.npy

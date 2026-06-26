@@ -13,10 +13,74 @@ DATA_DIR = os.path.join(REPO_ROOT, "data")
 # Global cached gallery data
 cached_gallery_data = None
 
+
+def build_and_cache_gallery(cache_path, model, device):
+    print(f"==> Cache not found at {cache_path}. Extracting gallery features dynamically...")
+    from torch.utils.data import DataLoader
+    from caj import datasets
+    from caj.utils.data.preprocessor import Preprocessor
+    import torchvision.transforms as T_vision
+
+    dataset_root = os.path.join(DATA_DIR, 'market1501')
+
+    if not os.path.exists(dataset_root):
+        raise FileNotFoundError(f"Market-1501 dataset not found at {dataset_root}. Please run download_datasets.py market1501 first.")
+
+    dataset = datasets.create('market1501', dataset_root)
+
+    normalizer = T_vision.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transformer = T_vision.Compose([
+        T_vision.Resize((256, 128), interpolation=T_vision.InterpolationMode.BICUBIC),
+        T_vision.ToTensor(),
+        normalizer
+    ])
+
+    gallery_loader = DataLoader(
+        Preprocessor(dataset.gallery, root=dataset.images_dir, transform=transformer),
+        batch_size=256, num_workers=4,
+        shuffle=False, pin_memory=True
+    )
+
+    gallery_features = []
+    gallery_paths = []
+    gallery_pids = []
+    gallery_camids = []
+
+    import torch
+    with torch.no_grad():
+        for i, (imgs, fnames, pids, camids, _) in enumerate(gallery_loader):
+            imgs = imgs.to(device)
+            outputs = model(imgs)
+            if isinstance(outputs, (tuple, list)):
+                outputs = outputs[0]
+
+            gallery_features.append(outputs.cpu().numpy())
+            gallery_paths.extend(fnames)
+            gallery_pids.extend(pids.numpy())
+            gallery_camids.extend(camids.numpy())
+
+            if (i + 1) % 10 == 0:
+                print(f"Extraction progress: [{i+1}/{len(gallery_loader)}]")
+
+    gallery_features = np.concatenate(gallery_features, axis=0)
+
+    data_dict = {
+        'features': gallery_features,
+        'image_paths': np.array(gallery_paths),
+        'pids': np.array(gallery_pids),
+        'camids': np.array(gallery_camids)
+    }
+
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    np.savez(cache_path, **data_dict)
+    print(f"==> Successfully cached {len(gallery_paths)} gallery embeddings to {cache_path}")
+    return data_dict
+
+
 def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
     global cached_gallery_data
     print(f"\n==> search_gallery called! query_img_type={type(query_img)}, use_caj={use_caj}, top_k={top_k}, query_cam_id={query_cam_id}")
-    
+
     # Fallback to live webcam crop if no query image is uploaded/snapshotted
     if query_img is None:
         print("==> search_gallery: query_img is None. Checking live webcam...")
@@ -35,12 +99,12 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
         # 1. Lazy load model
         model, device = get_reid_model()
         print("==> get_reid_model returned successfully.")
-        
+
         # 2. Extract query feature
         import torch
         from PIL import Image
         import torchvision.transforms as T_vision
-        
+
         if isinstance(query_img, str):
             pil_img = Image.open(query_img).convert('RGB')
         elif isinstance(query_img, np.ndarray):
@@ -75,10 +139,17 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
 
         # 3. Lazy load gallery features cache
         if cached_gallery_data is None:
-            cache_path = os.path.join(CACHE_DIR, 'market1501_gallery_features.npy')
+            cache_path = os.path.join(CACHE_DIR, 'market1501_gallery_features.npz')
             if not os.path.exists(cache_path):
-                return [("https://via.placeholder.com/150?text=Run+Cache+Script+First", "Cache not found")], [], None
-            cached_gallery_data = np.load(cache_path, allow_pickle=True).item()
+                cached_gallery_data = build_and_cache_gallery(cache_path, model, device)
+            else:
+                with np.load(cache_path) as data:
+                    cached_gallery_data = {
+                        'features': data['features'],
+                        'image_paths': data['image_paths'],
+                        'pids': data['pids'],
+                        'camids': data['camids']
+                    }
 
         g_features = cached_gallery_data['features']
         g_paths = cached_gallery_data['image_paths']
@@ -87,28 +158,28 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
         # 4. Compute Cosine similarity & Baseline Ranking
         q_f = query_feat / np.linalg.norm(query_feat, axis=1, keepdims=True)
         g_f = g_features / np.linalg.norm(g_features, axis=1, keepdims=True)
-        
+
         dist_matrix = 1.0 - np.dot(q_f, g_f.T)
         dist = dist_matrix[0]
-        
+
         initial_indices = np.argsort(dist)
         top_200_indices = initial_indices[:200]
-        
+
         # 5. Localized CA-Jaccard Re-ranking
         if use_caj:
             from caj.utils.rerank import re_ranking
-            
+
             # Setup inputs for re_ranking
             q_g_dist = dist[top_200_indices].reshape(1, 200)
             q_q_dist = np.zeros((1, 1))
-            
+
             top_200_features = g_f[top_200_indices]
             g_g_dist = 1.0 - np.dot(top_200_features, top_200_features.T)
-            
+
             query_cam = int(query_cam_id)
             gallery_cams = g_camids[top_200_indices]
             cids = np.concatenate([np.array([query_cam]), gallery_cams])
-            
+
             # Setup dummy args
             class CAJArgs:
                 def __init__(self):
@@ -120,10 +191,10 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
                     self.clqe = True
                     self.k2_intra = 2
                     self.k2_inter = 4
-                    
+
             args = CAJArgs()
             final_dist = re_ranking(q_g_dist, q_q_dist, g_g_dist, cids, args)
-            
+
             reranked_sub_indices = np.argsort(final_dist[0])
             final_top_indices = top_200_indices[reranked_sub_indices]
         else:
@@ -134,7 +205,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
         for rank_idx, idx in enumerate(initial_indices[:top_k]):
             img_path = g_paths[idx]
             cam_id = g_camids[idx]
-            
+
             # Load and convert to RGB
             img = cv2.imread(img_path)
             if img is not None:
@@ -155,18 +226,18 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
         for rank_idx, idx in enumerate(final_top_indices[:top_k]):
             img_path = g_paths[idx]
             cam_id = g_camids[idx]
-            
+
             # Find baseline position
             baseline_pos = np.where(initial_indices == idx)[0][0]
-            
+
             img = cv2.imread(img_path)
             if img is not None:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                
+
                 # Check for rank improvement
                 improved = use_caj and (rank_idx < baseline_pos)
                 is_same_cam = int(cam_id) == int(query_cam_id)
-                
+
                 if improved:
                     # Green border
                     img = cv2.copyMakeBorder(img, 8, 8, 8, 8, cv2.BORDER_CONSTANT, value=[46, 204, 113])
@@ -177,7 +248,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
                     caption = f"Rank {rank_idx+1} | Cam {cam_id} (Same Cam)"
                 else:
                     caption = f"Rank {rank_idx+1} | Cam {cam_id}"
-                
+
                 final_results.append((img, caption))
             else:
                 final_results.append((np.zeros((128, 64, 3), dtype=np.uint8), f"Missing: {os.path.basename(img_path)}"))
@@ -204,11 +275,11 @@ def run_comparison(raw_img, kalman_img):
     if raw_img is None or kalman_img is None:
         print("==> run_comparison: Query images are still None!")
         return [], [], [], [], raw_img, kalman_img
-    
+
     # Mode 1 & 3 use raw query, Mode 2 & 4 use Kalman-smoothed query
     m1_out, _, _ = search_gallery(raw_img, use_caj=False, top_k=5, query_cam_id="0")
     m2_out, _, _ = search_gallery(kalman_img, use_caj=False, top_k=5, query_cam_id="0")
     _, m3_out, _ = search_gallery(raw_img, use_caj=True, top_k=5, query_cam_id="0")
     _, m4_out, _ = search_gallery(kalman_img, use_caj=True, top_k=5, query_cam_id="0")
-    
+
     return m1_out, m2_out, m3_out, m4_out, raw_img, kalman_img
