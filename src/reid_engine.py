@@ -19,7 +19,7 @@ def _bg_load_model():
     try:
         import torch.nn.functional as F
 
-        from caj.utils.serialization import load_checkpoint, copy_state_dict
+        from .caj.utils.serialization import load_checkpoint, copy_state_dict
 
         class NormalizedFeatureModel(nn.Module):
             def __init__(self, model, normalize=True):
@@ -35,10 +35,10 @@ def _bg_load_model():
                     outputs = F.normalize(outputs, dim=1, p=2)
                 return outputs
 
-        bot_root = os.path.join(os.path.dirname(__file__), '..', 'thirdparty', 'bot')
-        if bot_root not in sys.path:
-            sys.path.insert(0, bot_root)
-        from modeling.baseline import Baseline
+        repo_root = os.path.dirname(os.path.dirname(__file__))
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+        from thirdparty.bot.modeling.baseline import Baseline
 
         # Market-1501 dataset has 751 train pids
         num_classes = 751

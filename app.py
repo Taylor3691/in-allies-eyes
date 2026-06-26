@@ -1,16 +1,20 @@
 import sys
 import os
+
 import gradio as gr
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-from webcam_handler import toggle_camera, capture_query, reset_tracker, update_kalman_state
-from gallery_search import search_gallery, run_comparison
+repo_root = os.path.dirname(os.path.abspath(__file__))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+from src.webcam_handler import toggle_camera, capture_query, reset_tracker, update_kalman_state
+from src.gallery_search import search_gallery, run_comparison
 
 # Gradio Blocks layout initialization
 with gr.Blocks(title="Person Re-ID Demo App") as demo:
     gr.Markdown("# Person Re-Identification (Re-ID) Demo Interface")
     gr.Markdown("### Track targets with Kalman Filter & Optimize retrieval with CA-Jaccard Re-ranking")
-    
+
     # -------------------------------------------------------------
     # Tab 1: Realtime Capture / Kalman Demo
     # -------------------------------------------------------------
@@ -20,20 +24,20 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
                 gr.Markdown("#### Webcam Video Stream")
                 # Single display for output; direct camera streaming loop
                 webcam_placeholder = gr.Image(label="Live Video Feed (Webcam Stream)")
-                
+
             with gr.Column(scale=1):
                 gr.Markdown("#### Bounding Box & Tracking Controls")
                 # Custom toggle button outside the frame
                 btn_toggle_cam = gr.Button("Start Camera", variant="secondary")
-                
+
                 use_kalman = gr.Checkbox(label="Use Kalman Filter", value=False)
                 det_status = gr.Label(value="Missing", label="Detector Status")
                 kf_mode = gr.Label(value="Predict only", label="Kalman Mode")
                 cam_id = gr.Textbox(label="Manual Camera ID Input", value="0")
-                
+
                 btn_reset = gr.Button("Reset Tracker")
                 btn_capture = gr.Button("Capture Query", variant="primary")
-        
+
         with gr.Row():
             with gr.Column():
                 gr.Markdown("#### Bottom Section - Capture Information")
@@ -53,20 +57,20 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
                 gr.Markdown("#### Query Input & Management")
                 query_upload = gr.Image(label="Query Image")
                 dataset_selector = gr.Radio(
-                    choices=["Market-1501 (Default)", "Custom"], 
-                    value="Market-1501 (Default)", 
+                    choices=["Market-1501 (Default)", "Custom"],
+                    value="Market-1501 (Default)",
                     label="Dataset Selector"
                 )
                 query_camera_id = gr.Textbox(label="Query Camera ID", value="0")
-                
+
             with gr.Column(scale=1):
                 gr.Markdown("#### Search & Re-ranking Controls")
                 use_caj_ranking = gr.Checkbox(label="Use CA-Jaccard Re-ranking", value=True)
                 top_k_selector = gr.Dropdown(choices=[5, 10], value=5, label="Top-K Results")
-                
+
                 btn_search = gr.Button("Search Gallery", variant="primary")
                 btn_clear = gr.Button("Clear Result")
-                
+
         with gr.Column():
             gr.Markdown("#### Results Panel")
             baseline_gallery = gr.Gallery(label="Baseline Top-K Results (Cosine/Euclidean Similarity)")
@@ -80,9 +84,9 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
         with gr.Row():
             raw_query_img = gr.Image(label="Raw Query Image Component (Red Box Crop)")
             kalman_query_img = gr.Image(label="Kalman-smoothed Query Image Component (Green Box Crop)")
-            
+
         btn_run_compare = gr.Button("Run 4-Mode Comparison", variant="primary")
-        
+
         gr.Markdown("#### 4-Column/Grid Comparison Engine (Top-5 Results)")
         with gr.Row():
             mode1_out = gr.Gallery(label="Mode 1: Kalman OFF | CA-Jaccard OFF")

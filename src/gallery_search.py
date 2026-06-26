@@ -1,9 +1,14 @@
 import os
 import cv2
 import numpy as np
-from reid_engine import get_reid_model
-from webcam_handler import capture_live_fallback, capture_live_both
-import webcam_handler
+import torch
+from PIL import Image
+from torch.utils.data import DataLoader
+import torchvision.transforms as T_vision
+
+from .reid_engine import get_reid_model
+from .webcam_handler import capture_live_fallback, capture_live_both
+from . import webcam_handler
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,10 +21,9 @@ cached_gallery_data = None
 
 def build_and_cache_gallery(cache_path, model, device):
     print(f"==> Cache not found at {cache_path}. Extracting gallery features dynamically...")
-    from torch.utils.data import DataLoader
-    from caj import datasets
-    from caj.utils.data.preprocessor import Preprocessor
-    import torchvision.transforms as T_vision
+
+    from .caj import datasets
+    from .caj.utils.data.preprocessor import Preprocessor
 
     dataset_root = os.path.join(DATA_DIR, 'market1501')
 
@@ -46,7 +50,6 @@ def build_and_cache_gallery(cache_path, model, device):
     gallery_pids = []
     gallery_camids = []
 
-    import torch
     with torch.no_grad():
         for i, (imgs, fnames, pids, camids, _) in enumerate(gallery_loader):
             imgs = imgs.to(device)
@@ -101,10 +104,6 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
         print("==> get_reid_model returned successfully.")
 
         # 2. Extract query feature
-        import torch
-        from PIL import Image
-        import torchvision.transforms as T_vision
-
         if isinstance(query_img, str):
             pil_img = Image.open(query_img).convert('RGB')
         elif isinstance(query_img, np.ndarray):
@@ -167,7 +166,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
 
         # 5. Localized CA-Jaccard Re-ranking
         if use_caj:
-            from caj.utils.rerank import re_ranking
+            from .caj.utils.rerank import re_ranking
 
             # Setup inputs for re_ranking
             q_g_dist = dist[top_200_indices].reshape(1, 200)
