@@ -5,6 +5,7 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 import torchvision.transforms as T_vision
+import gradio as gr
 
 from .reid_engine import get_reid_model
 from .webcam_handler import capture_live_fallback, capture_live_both
@@ -21,7 +22,7 @@ BORDER_RATIO = 0.04
 cached_gallery_data = {}
 
 
-def build_and_cache_gallery(cache_path, model, device, dataset_name='market1501'):
+def build_and_cache_gallery(cache_path, model, device, dataset_name, progress):
     print(f"==> Cache not found at {cache_path}. Extracting gallery features dynamically for {dataset_name}...")
     from ..caj import datasets
     from ..caj.utils.data.preprocessor import Preprocessor
@@ -63,8 +64,7 @@ def build_and_cache_gallery(cache_path, model, device, dataset_name='market1501'
             gallery_pids.extend(pids.numpy())
             gallery_camids.extend(camids.numpy())
 
-            if (i + 1) % 10 == 0:
-                print(f"Extraction progress: [{i+1}/{len(gallery_loader)}]")
+            progress(i / len(gallery_loader), desc=f"Extracting gallery features ({i+1}/{len(gallery_loader)})")
 
     gallery_features = np.concatenate(gallery_features, axis=0)
 
@@ -81,7 +81,7 @@ def build_and_cache_gallery(cache_path, model, device, dataset_name='market1501'
     return data_dict
 
 
-def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Market1501"):
+def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Market1501", progress=gr.Progress()):
     global cached_gallery_data
     print(f"\n==> search_gallery called! query_img_type={type(query_img)}, use_caj={use_caj}, top_k={top_k}, query_cam_id={query_cam_id}, dataset_name={dataset_name}")
 
@@ -149,7 +149,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Mark
 
         if dataset_name not in cached_gallery_data:
             if not os.path.exists(cache_path):
-                cached_gallery_data[dataset_name] = build_and_cache_gallery(cache_path, model, device, internal_dataset_name)
+                cached_gallery_data[dataset_name] = build_and_cache_gallery(cache_path, model, device, internal_dataset_name, progress)
             else:
                 with np.load(cache_path) as data:
                     cached_gallery_data[dataset_name] = {
@@ -266,7 +266,6 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Mark
             else:
                 final_results.append((np.zeros((128, 64, 3), dtype=np.uint8), f"Missing: {os.path.basename(img_path)}"))
 
-        import gradio as gr
         return (
             gr.update(value=baseline_results, selected_index=0),
             gr.update(value=final_results, selected_index=0),
@@ -300,7 +299,6 @@ def run_comparison(raw_img, kalman_img):
     _, m3_out, _ = search_gallery(raw_img, use_caj=True, top_k=5, query_cam_id="0")
     _, m4_out, _ = search_gallery(kalman_img, use_caj=True, top_k=5, query_cam_id="0")
 
-    import gradio as gr
     return (
         gr.update(value=m1_out['value'] if isinstance(m1_out, dict) else m1_out, selected_index=0),
         gr.update(value=m2_out['value'] if isinstance(m2_out, dict) else m2_out, selected_index=0),
