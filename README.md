@@ -52,7 +52,7 @@ python scripts/download_datasets.py market1501 --keep-archives
 Download the pretrained models:
 
 ```bash
-# Download demo checkpoints for Market1501
+# Download BoT weights for Market1501 and CUHK03 (required for demo app)
 python scripts/download_pretrained_models.py demo
 
 # Download ImageNet-pretrained ResNet50 backbone (required for training)
@@ -65,7 +65,35 @@ Pretrained backbones and checkpoints are saved under the `pretrained_models/` di
 
 ## Demo App
 
-[Placeholder for Demo App description and instructions]
+The interactive Gradio web application showcases the Re-ID pipeline in real time. It lazy-loads models dynamically, processes live webcam inputs, and handles custom queries on both **Market-1501** and **CUHK03** datasets.
+
+### Key Features
+1. **Real-time Webcam Capture & Kalman Tracking**:
+   * Track targets in real-time using a Kalman Filter state tracking pipeline.
+   * Crop and capture the tracked query directly from the live feed.
+2. **Dual-Dataset Gallery Search**:
+   * Search against pre-indexed galleries for **Market-1501** or **CUHK03** (or custom query files).
+   * Lazy model loading: resolves and loads the correct model checkpoint dynamically depending on the selected dataset.
+   * Automatic caching: Missed cache files are extracted dynamically and stored in high-performance, uncompressed `.npz` files.
+3. **CA-Jaccard (CAJ) Re-ranking**:
+   * Retrieve baseline rankings using Cosine Similarity and optimize them on-the-fly using localized CA-Jaccard re-ranking.
+   * Visual indicator borders: **Yellow** for matches captured by the same camera, and **Green** to highlight items whose rank improved via CAJ re-ranking.
+4. **4-Mode Comparison Matrix**:
+   * Perform side-by-side Top-5 evaluations comparing all combinations of Kalman Filter and CA-Jaccard options (ON/OFF).
+
+### How to Run
+Ensure you have downloaded the BoT checkpoint weights (see [Pretrained Weights](#pretrained-weights)). Launch the app using:
+
+```bash
+python scripts/demo.py
+```
+
+### How to Access
+Once launched, the app runs a local Gradio server. Access the interface by opening the following URL in your web browser:
+
+```
+http://127.0.0.1:7860
+```
 
 ---
 
