@@ -57,11 +57,11 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
                 gr.Markdown("#### Query Input & Management")
                 query_upload = gr.Image(label="Query Image")
                 dataset_selector = gr.Radio(
-                    choices=["Market-1501 (Default)", "Custom"],
-                    value="Market-1501 (Default)",
+                    choices=["Market1501", "CUHK03", "Custom"],
+                    value="Market1501",
                     label="Dataset Selector"
                 )
-                query_camera_id = gr.Textbox(label="Query Camera ID", value="0")
+                query_camera_id = gr.Number(label="Query Camera ID", value=1, minimum=1, maximum=6, precision=0)
 
             with gr.Column(scale=1):
                 gr.Markdown("#### Search & Re-ranking Controls")
@@ -114,9 +114,20 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
             raw_query_img, kalman_query_img
         ]
     )
+
+    dataset_selector.change(
+        fn=(lambda dataset:
+            gr.update(minimum=1, maximum=2, value=1)
+            if dataset == "CUHK03"
+            else gr.update(minimum=1, maximum=6, value=1)
+        ),
+        inputs=[dataset_selector],
+        outputs=[query_camera_id]
+    )
+
     btn_search.click(
         fn=search_gallery,
-        inputs=[query_upload, use_caj_ranking, top_k_selector, query_camera_id],
+        inputs=[query_upload, use_caj_ranking, top_k_selector, query_camera_id, dataset_selector],
         outputs=[baseline_gallery, final_gallery, query_upload],
         show_progress="full",
     )

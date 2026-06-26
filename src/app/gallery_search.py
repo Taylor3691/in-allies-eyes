@@ -17,22 +17,21 @@ DATA_DIR = os.path.join(REPO_ROOT, "data")
 
 BORDER_RATIO = 0.04
 
-# Global cached gallery data
-cached_gallery_data = None
+# Global cached gallery data dict mapping dataset name to its cached data dict
+cached_gallery_data = {}
 
 
-def build_and_cache_gallery(cache_path, model, device):
-    print(f"==> Cache not found at {cache_path}. Extracting gallery features dynamically...")
-
+def build_and_cache_gallery(cache_path, model, device, dataset_name='market1501'):
+    print(f"==> Cache not found at {cache_path}. Extracting gallery features dynamically for {dataset_name}...")
     from ..caj import datasets
     from ..caj.utils.data.preprocessor import Preprocessor
 
-    dataset_root = os.path.join(DATA_DIR, 'market1501')
+    dataset_root = os.path.join(DATA_DIR, dataset_name)
 
     if not os.path.exists(dataset_root):
-        raise FileNotFoundError(f"Market-1501 dataset not found at {dataset_root}. Please run download_datasets.py market1501 first.")
+        raise FileNotFoundError(f"{dataset_name} dataset not found at {dataset_root}. Please run download_datasets.py first.")
 
-    dataset = datasets.create('market1501', dataset_root)
+    dataset = datasets.create(dataset_name, dataset_root)
 
     normalizer = T_vision.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transformer = T_vision.Compose([
@@ -82,9 +81,9 @@ def build_and_cache_gallery(cache_path, model, device):
     return data_dict
 
 
-def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
+def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Market-1501 (Default)"):
     global cached_gallery_data
-    print(f"\n==> search_gallery called! query_img_type={type(query_img)}, use_caj={use_caj}, top_k={top_k}, query_cam_id={query_cam_id}")
+    print(f"\n==> search_gallery called! query_img_type={type(query_img)}, use_caj={use_caj}, top_k={top_k}, query_cam_id={query_cam_id}, dataset_name={dataset_name}")
 
     # Fallback to live webcam crop if no query image is uploaded/snapshotted
     if query_img is None:
@@ -104,6 +103,11 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
         # 1. Lazy load model
         model, device = get_reid_model()
         print("==> get_reid_model returned successfully.")
+
+        # Shift camera ID for Market-1501/Custom
+        query_cam = int(query_cam_id)
+        if dataset_name != "CUHK03":
+            query_cam = query_cam - 1
 
         # 2. Extract query feature
         if isinstance(query_img, str):
@@ -139,22 +143,26 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
             query_feat = query_feat.cpu().numpy() # shape (1, D)
 
         # 3. Lazy load gallery features cache
-        if cached_gallery_data is None:
-            cache_path = os.path.join(CACHE_DIR, 'market1501_gallery_features.npz')
+        cache_filename = 'cuhk03_gallery_features.npz' if dataset_name == "CUHK03" else 'market1501_gallery_features.npz'
+        internal_dataset_name = 'cuhk03' if dataset_name == "CUHK03" else 'market1501'
+        cache_path = os.path.join(CACHE_DIR, cache_filename)
+
+        if dataset_name not in cached_gallery_data:
             if not os.path.exists(cache_path):
-                cached_gallery_data = build_and_cache_gallery(cache_path, model, device)
+                cached_gallery_data[dataset_name] = build_and_cache_gallery(cache_path, model, device, internal_dataset_name)
             else:
                 with np.load(cache_path) as data:
-                    cached_gallery_data = {
+                    cached_gallery_data[dataset_name] = {
                         'features': data['features'],
                         'image_paths': data['image_paths'],
                         'pids': data['pids'],
                         'camids': data['camids']
                     }
 
-        g_features = cached_gallery_data['features']
-        g_paths = cached_gallery_data['image_paths']
-        g_camids = cached_gallery_data['camids']
+        g_data = cached_gallery_data[dataset_name]
+        g_features = g_data['features']
+        g_paths = g_data['image_paths']
+        g_camids = g_data['camids']
 
         # 4. Compute Cosine similarity & Baseline Ranking
         q_f = query_feat / np.linalg.norm(query_feat, axis=1, keepdims=True)
@@ -177,7 +185,6 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
             top_200_features = g_f[top_200_indices]
             g_g_dist = 1.0 - np.dot(top_200_features, top_200_features.T)
 
-            query_cam = int(query_cam_id)
             gallery_cams = g_camids[top_200_indices]
             cids = np.concatenate([np.array([query_cam]), gallery_cams])
 
@@ -212,13 +219,14 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
             if img is not None:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 # Same-camera highlight
-                if int(cam_id) == int(query_cam_id):
+                disp_cam_id = int(cam_id) + (1 if dataset_name != "CUHK03" else 0)
+                if int(cam_id) == query_cam:
                     # Yellow border relative to image size
                     border_w = max(1, int(img.shape[1] * BORDER_RATIO))
                     img = cv2.copyMakeBorder(img, border_w, border_w, border_w, border_w, cv2.BORDER_CONSTANT, value=[255, 220, 0])
-                    caption = f"Rank {rank_idx+1} | Cam {cam_id} (Same Cam)"
+                    caption = f"Rank {rank_idx+1} | Cam {disp_cam_id} (Same Cam)"
                 else:
-                    caption = f"Rank {rank_idx+1} | Cam {cam_id}"
+                    caption = f"Rank {rank_idx+1} | Cam {disp_cam_id}"
                 baseline_results.append((img, caption))
             else:
                 baseline_results.append((np.zeros((128, 64, 3), dtype=np.uint8), f"Missing: {os.path.basename(img_path)}"))
@@ -237,21 +245,22 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
                 # Check for rank improvement
+                disp_cam_id = int(cam_id) + (1 if dataset_name != "CUHK03" else 0)
                 improved = use_caj and (rank_idx < baseline_pos)
-                is_same_cam = int(cam_id) == int(query_cam_id)
+                is_same_cam = int(cam_id) == query_cam
 
                 if improved or is_same_cam:
                     border_w = max(1, int(img.shape[1] * BORDER_RATIO))
                     if improved:
                         # Green border relative to image size
                         img = cv2.copyMakeBorder(img, border_w, border_w, border_w, border_w, cv2.BORDER_CONSTANT, value=[46, 204, 113])
-                        caption = f"Rank {rank_idx+1} | Cam {cam_id} (Improved from {baseline_pos+1}!)"
+                        caption = f"Rank {rank_idx+1} | Cam {disp_cam_id} (Improved from {baseline_pos+1}!)"
                     else:
                         # Yellow border relative to image size
                         img = cv2.copyMakeBorder(img, border_w, border_w, border_w, border_w, cv2.BORDER_CONSTANT, value=[255, 220, 0])
-                        caption = f"Rank {rank_idx+1} | Cam {cam_id} (Same Cam)"
+                        caption = f"Rank {rank_idx+1} | Cam {disp_cam_id} (Same Cam)"
                 else:
-                    caption = f"Rank {rank_idx+1} | Cam {cam_id}"
+                    caption = f"Rank {rank_idx+1} | Cam {disp_cam_id}"
 
                 final_results.append((img, caption))
             else:
