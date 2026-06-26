@@ -31,7 +31,7 @@ def _bg_load_model():
                     outputs = F.normalize(outputs, dim=1, p=2)
                 return outputs
 
-        bot_root = os.path.join(os.path.dirname(__file__), 'thirdparty', 'bot')
+        bot_root = os.path.join(os.path.dirname(__file__), '..', 'thirdparty', 'bot')
         if bot_root not in sys.path:
             sys.path.insert(0, bot_root)
         from modeling.baseline import Baseline
