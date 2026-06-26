@@ -3,12 +3,12 @@ import os
 
 import gradio as gr
 
-repo_root = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
-from src.webcam_handler import toggle_camera, capture_query, reset_tracker, update_kalman_state
-from src.gallery_search import search_gallery, run_comparison
+from src.app.webcam_handler import toggle_camera, capture_query, reset_tracker, update_kalman_state
+from src.app.gallery_search import search_gallery, run_comparison
 
 # Gradio Blocks layout initialization
 with gr.Blocks(title="Person Re-ID Demo App") as demo:
@@ -114,8 +114,18 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
             raw_query_img, kalman_query_img
         ]
     )
-    btn_search.click(fn=search_gallery, inputs=[query_upload, use_caj_ranking, top_k_selector, query_camera_id], outputs=[baseline_gallery, final_gallery, query_upload], show_progress="full")
-    btn_run_compare.click(fn=run_comparison, inputs=[raw_query_img, kalman_query_img], outputs=[mode1_out, mode2_out, mode3_out, mode4_out, raw_query_img, kalman_query_img], show_progress="full")
+    btn_search.click(
+        fn=search_gallery,
+        inputs=[query_upload, use_caj_ranking, top_k_selector, query_camera_id],
+        outputs=[baseline_gallery, final_gallery, query_upload],
+        show_progress="full",
+    )
+    btn_run_compare.click(
+        fn=run_comparison,
+        inputs=[raw_query_img, kalman_query_img],
+        outputs=[mode1_out, mode2_out, mode3_out, mode4_out, raw_query_img, kalman_query_img],
+        show_progress="full",
+    )
 
 if __name__ == "__main__":
     demo.launch()

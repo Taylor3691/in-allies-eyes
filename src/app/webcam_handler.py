@@ -3,11 +3,11 @@ import cv2
 import numpy as np
 import time
 
-from .kalman_filter import KalmanTracker
+from ..kalman_filter import KalmanTracker
 from .reid_engine import get_reid_model
 
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CACHE_DIR = os.path.join(REPO_ROOT, ".cache")
 
 # OpenCV face detector cascade classifier

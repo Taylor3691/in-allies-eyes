@@ -7,6 +7,9 @@ import torch
 import torch.nn as nn
 
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 # Global Re-ID Model variables for lazy loading
 reid_model: tuple[nn.Module, torch.device] | None = None
 reid_model_lock = threading.Lock()
@@ -19,7 +22,7 @@ def _bg_load_model():
     try:
         import torch.nn.functional as F
 
-        from .caj.utils.serialization import load_checkpoint, copy_state_dict
+        from ..caj.utils.serialization import load_checkpoint, copy_state_dict
 
         class NormalizedFeatureModel(nn.Module):
             def __init__(self, model, normalize=True):
@@ -35,9 +38,8 @@ def _bg_load_model():
                     outputs = F.normalize(outputs, dim=1, p=2)
                 return outputs
 
-        repo_root = os.path.dirname(os.path.dirname(__file__))
-        if repo_root not in sys.path:
-            sys.path.insert(0, repo_root)
+        if REPO_ROOT not in sys.path:
+            sys.path.insert(0, REPO_ROOT)
         from thirdparty.bot.modeling.baseline import Baseline
 
         # Market-1501 dataset has 751 train pids
@@ -53,7 +55,7 @@ def _bg_load_model():
         )
         model = NormalizedFeatureModel(raw_model, normalize=True)
 
-        checkpoint_path = os.path.join(os.path.dirname(__file__), '..', 'pretrained_models', 'market_resnet50_model_120_rank1_945.pth')
+        checkpoint_path = os.path.join(REPO_ROOT, 'pretrained_models', 'market_resnet50_model_120_rank1_945.pth')
         if not os.path.exists(checkpoint_path):
             raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}. Please run scripts/download_pretrained_models.py demo.")
 

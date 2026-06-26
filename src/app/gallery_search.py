@@ -11,7 +11,7 @@ from .webcam_handler import capture_live_fallback, capture_live_both
 from . import webcam_handler
 
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CACHE_DIR = os.path.join(REPO_ROOT, ".cache")
 DATA_DIR = os.path.join(REPO_ROOT, "data")
 
@@ -22,8 +22,8 @@ cached_gallery_data = None
 def build_and_cache_gallery(cache_path, model, device):
     print(f"==> Cache not found at {cache_path}. Extracting gallery features dynamically...")
 
-    from .caj import datasets
-    from .caj.utils.data.preprocessor import Preprocessor
+    from ..caj import datasets
+    from ..caj.utils.data.preprocessor import Preprocessor
 
     dataset_root = os.path.join(DATA_DIR, 'market1501')
 
@@ -166,7 +166,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
 
         # 5. Localized CA-Jaccard Re-ranking
         if use_caj:
-            from .caj.utils.rerank import re_ranking
+            from ..caj.utils.rerank import re_ranking
 
             # Setup inputs for re_ranking
             q_g_dist = dist[top_200_indices].reshape(1, 200)
