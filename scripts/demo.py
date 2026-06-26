@@ -131,6 +131,10 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
         outputs=[baseline_gallery, final_gallery, query_upload],
         show_progress="full",
     )
+    btn_clear.click(
+        fn=lambda: [None, None],
+        outputs=[baseline_gallery, final_gallery],
+    )
     btn_run_compare.click(
         fn=run_comparison,
         inputs=[raw_query_img, kalman_query_img],
