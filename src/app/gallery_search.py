@@ -81,7 +81,7 @@ def build_and_cache_gallery(cache_path, model, device, dataset_name='market1501'
     return data_dict
 
 
-def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Market-1501 (Default)"):
+def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Market1501"):
     global cached_gallery_data
     print(f"\n==> search_gallery called! query_img_type={type(query_img)}, use_caj={use_caj}, top_k={top_k}, query_cam_id={query_cam_id}, dataset_name={dataset_name}")
 
@@ -101,7 +101,7 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Mark
 
     try:
         # 1. Lazy load model
-        model, device = get_reid_model()
+        model, device = get_reid_model(dataset_name)
         print("==> get_reid_model returned successfully.")
 
         # Shift camera ID for Market-1501/Custom
