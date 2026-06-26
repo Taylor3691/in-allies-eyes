@@ -15,6 +15,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 CACHE_DIR = os.path.join(REPO_ROOT, ".cache")
 DATA_DIR = os.path.join(REPO_ROOT, "data")
 
+BORDER_RATIO = 0.04
+
 # Global cached gallery data
 cached_gallery_data = None
 
@@ -211,8 +213,9 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 # Same-camera highlight
                 if int(cam_id) == int(query_cam_id):
-                    # Yellow border
-                    img = cv2.copyMakeBorder(img, 8, 8, 8, 8, cv2.BORDER_CONSTANT, value=[255, 220, 0])
+                    # Yellow border relative to image size
+                    border_w = max(1, int(img.shape[1] * BORDER_RATIO))
+                    img = cv2.copyMakeBorder(img, border_w, border_w, border_w, border_w, cv2.BORDER_CONSTANT, value=[255, 220, 0])
                     caption = f"Rank {rank_idx+1} | Cam {cam_id} (Same Cam)"
                 else:
                     caption = f"Rank {rank_idx+1} | Cam {cam_id}"
@@ -237,14 +240,16 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
                 improved = use_caj and (rank_idx < baseline_pos)
                 is_same_cam = int(cam_id) == int(query_cam_id)
 
-                if improved:
-                    # Green border
-                    img = cv2.copyMakeBorder(img, 8, 8, 8, 8, cv2.BORDER_CONSTANT, value=[46, 204, 113])
-                    caption = f"Rank {rank_idx+1} | Cam {cam_id} (Improved from {baseline_pos+1}!)"
-                elif is_same_cam:
-                    # Yellow border
-                    img = cv2.copyMakeBorder(img, 8, 8, 8, 8, cv2.BORDER_CONSTANT, value=[255, 220, 0])
-                    caption = f"Rank {rank_idx+1} | Cam {cam_id} (Same Cam)"
+                if improved or is_same_cam:
+                    border_w = max(1, int(img.shape[1] * BORDER_RATIO))
+                    if improved:
+                        # Green border relative to image size
+                        img = cv2.copyMakeBorder(img, border_w, border_w, border_w, border_w, cv2.BORDER_CONSTANT, value=[46, 204, 113])
+                        caption = f"Rank {rank_idx+1} | Cam {cam_id} (Improved from {baseline_pos+1}!)"
+                    else:
+                        # Yellow border relative to image size
+                        img = cv2.copyMakeBorder(img, border_w, border_w, border_w, border_w, cv2.BORDER_CONSTANT, value=[255, 220, 0])
+                        caption = f"Rank {rank_idx+1} | Cam {cam_id} (Same Cam)"
                 else:
                     caption = f"Rank {rank_idx+1} | Cam {cam_id}"
 
@@ -252,7 +257,12 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id="0"):
             else:
                 final_results.append((np.zeros((128, 64, 3), dtype=np.uint8), f"Missing: {os.path.basename(img_path)}"))
 
-        return baseline_results, final_results, query_img
+        import gradio as gr
+        return (
+            gr.update(value=baseline_results, selected_index=0),
+            gr.update(value=final_results, selected_index=0),
+            gr.update(value=query_img)
+        )
 
     except Exception as e:
         import traceback
@@ -281,4 +291,12 @@ def run_comparison(raw_img, kalman_img):
     _, m3_out, _ = search_gallery(raw_img, use_caj=True, top_k=5, query_cam_id="0")
     _, m4_out, _ = search_gallery(kalman_img, use_caj=True, top_k=5, query_cam_id="0")
 
-    return m1_out, m2_out, m3_out, m4_out, raw_img, kalman_img
+    import gradio as gr
+    return (
+        gr.update(value=m1_out['value'] if isinstance(m1_out, dict) else m1_out, selected_index=0),
+        gr.update(value=m2_out['value'] if isinstance(m2_out, dict) else m2_out, selected_index=0),
+        gr.update(value=m3_out['value'] if isinstance(m3_out, dict) else m3_out, selected_index=0),
+        gr.update(value=m4_out['value'] if isinstance(m4_out, dict) else m4_out, selected_index=0),
+        gr.update(value=raw_img),
+        gr.update(value=kalman_img)
+    )
