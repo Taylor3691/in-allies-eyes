@@ -3,18 +3,22 @@ import sys
 import threading
 import time
 
+import torch
+import torch.nn as nn
+
+
 # Global Re-ID Model variables for lazy loading
-reid_model = None
+reid_model: tuple[nn.Module, torch.device] | None = None
 reid_model_lock = threading.Lock()
 _model_loading_thread = None
 _model_loading_error = None
 
+
 def _bg_load_model():
     global reid_model, _model_loading_error
     try:
-        import torch
-        import torch.nn as nn
         import torch.nn.functional as F
+
         from caj.utils.serialization import load_checkpoint, copy_state_dict
 
         class NormalizedFeatureModel(nn.Module):
@@ -69,6 +73,7 @@ def _bg_load_model():
         import traceback
         traceback.print_exc()
 
+
 def get_reid_model():
     global reid_model, _model_loading_thread, _model_loading_error
     if reid_model is not None:
@@ -90,4 +95,5 @@ def get_reid_model():
             if _model_loading_error is not None:
                 raise _model_loading_error
 
+    assert reid_model is not None
     return reid_model
