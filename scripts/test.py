@@ -84,11 +84,9 @@ def build_bot_model(args, num_classes):
     if args.arch != 'resnet50':
         raise ValueError("BoT checkpoint support currently only supports --arch resnet50")
 
-    bot_root = osp.join(osp.dirname(osp.abspath(__file__)), '..', 'thirdparty', 'bot')
-    if bot_root not in sys.path:
-        sys.path.insert(0, bot_root)
-
-    from modeling.baseline import Baseline
+    if osp.dirname(osp.dirname(osp.abspath(__file__))) not in sys.path:
+        sys.path.insert(0, osp.dirname(osp.dirname(osp.abspath(__file__))))
+    from thirdparty.bot.modeling.baseline import Baseline
 
     print("==> Building BoT ResNet50 BNNeck model")
     model = Baseline(
