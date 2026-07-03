@@ -130,8 +130,15 @@ def toggle_camera(use_kf):
 
 def capture_query(use_kf, camera_id):
     global latest_frame
+    try:
+        camera_id_int = int(camera_id)
+        if camera_id_int < 1:
+            camera_id_int = 1
+    except (ValueError, TypeError):
+        camera_id_int = 1
+
     if latest_frame is None:
-        return None, "No active frame captured", "N/A", "N/A", None, camera_id, None, None
+        return None, "No active frame captured", "N/A", "N/A", None, camera_id_int, None, None
 
     # Convert RGB frame back to BGR for OpenCV processing
     latest_bgr = cv2.cvtColor(latest_frame, cv2.COLOR_RGB2BGR)
@@ -192,7 +199,7 @@ def capture_query(use_kf, camera_id):
             source = "Raw bbox"
 
     if crop_rgb is None:
-        return None, "No target found to crop", "N/A", "N/A", None, camera_id, None, None
+        return None, "No target found to crop", "N/A", "N/A", None, camera_id_int, None, None
 
     quality = f"Contrast: {int(np.std(crop_rgb))}"
 
@@ -229,7 +236,7 @@ def capture_query(use_kf, camera_id):
     except Exception as e:
         print(f"Error during on-demand feature extraction: {e}")
 
-    return crop_rgb, source, camera_id, quality, crop_rgb, camera_id, raw_crop_rgb, kalman_crop_rgb
+    return crop_rgb, source, camera_id, quality, crop_rgb, camera_id_int, raw_crop_rgb, kalman_crop_rgb
 
 def capture_live_fallback(use_kf=False):
     global latest_frame, camera_active, tracker
