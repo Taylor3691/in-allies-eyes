@@ -8,7 +8,7 @@ import torchvision.transforms as T_vision
 import gradio as gr
 
 from .reid_engine import get_reid_model
-from .webcam_handler import capture_live_fallback, capture_live_both
+from .webcam_handler import capture_live_both
 from . import webcam_handler
 
 
@@ -85,17 +85,8 @@ def search_gallery(query_img, use_caj, top_k, query_cam_id=1, dataset_name="Mark
     global cached_gallery_data
     print(f"\n==> search_gallery called! query_img_type={type(query_img)}, use_caj={use_caj}, top_k={top_k}, query_cam_id={query_cam_id}, dataset_name={dataset_name}")
 
-    # Fallback to live webcam crop if no query image is uploaded/snapshotted
     if query_img is None:
-        print("==> search_gallery: query_img is None. Checking live webcam...")
-        crop_rgb, crop_source = capture_live_fallback(use_kf=webcam_handler.use_kalman_global)
-        if crop_rgb is not None:
-            query_img = crop_rgb
-            print(f"==> search_gallery: successfully captured crop from {crop_source}!")
-        else:
-            print(f"==> search_gallery: live fallback failed: {crop_source}")
-
-    if query_img is None:
+        gr.Warning("Please capture a query in Tab 1 or upload an image in Tab 2 first!")
         print("==> search_gallery: query_img is None!")
         return [], [], None
 

@@ -55,7 +55,7 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
         with gr.Row():
             with gr.Column(scale=1):
                 gr.Markdown("#### Query Input & Management")
-                query_upload = gr.Image(label="Query Image")
+                query_upload = gr.Image(label="Query Image", sources=["upload"])
                 dataset_selector = gr.Radio(
                     choices=["Market1501", "CUHK03", "Custom"],
                     value="Market1501",
@@ -82,8 +82,8 @@ with gr.Blocks(title="Person Re-ID Demo App") as demo:
     with gr.Tab("Four-Mode Top-5 Comparison"):
         gr.Markdown("#### Query Matrix Setup")
         with gr.Row():
-            raw_query_img = gr.Image(label="Raw Query Image Component (Red Box Crop)")
-            kalman_query_img = gr.Image(label="Kalman-smoothed Query Image Component (Green Box Crop)")
+            raw_query_img = gr.Image(label="Raw Query Image Component (Red Box Crop)", interactive=False)
+            kalman_query_img = gr.Image(label="Kalman-smoothed Query Image Component (Green Box Crop)", interactive=False)
 
         btn_run_compare = gr.Button("Run 4-Mode Comparison", variant="primary")
 
