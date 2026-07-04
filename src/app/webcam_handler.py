@@ -4,7 +4,6 @@ import numpy as np
 import time
 
 from ..kalman_filter import KalmanTracker
-from .reid_engine import get_reid_model
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -212,29 +211,6 @@ def capture_query(use_kf, camera_id):
     os.makedirs(save_dir, exist_ok=True)
     filename = f"crop_{int(time.time())}.png"
     cv2.imwrite(os.path.join(save_dir, filename), crop_bgr)
-
-    # Lazy-load model and run feature extraction to verify pipeline works
-    try:
-        model, device = get_reid_model()
-        import torch
-        from PIL import Image
-        import torchvision.transforms as T_vision
-        pil_img = Image.fromarray(crop_rgb)
-        normalizer = T_vision.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        transformer = T_vision.Compose([
-            T_vision.Resize((256, 128), interpolation=T_vision.InterpolationMode.BICUBIC),
-            T_vision.ToTensor(),
-            normalizer
-        ])
-        img_tensor = transformer(pil_img).unsqueeze(0).to(device)
-        with torch.no_grad():
-            feat = model(img_tensor)
-            if isinstance(feat, (tuple, list)):
-                feat = feat[0]
-            _ = feat.cpu().numpy()
-        print("==> Feature extracted successfully for captured query.")
-    except Exception as e:
-        print(f"Error during on-demand feature extraction: {e}")
 
     return crop_rgb, source, camera_id, quality, crop_rgb, camera_id_int, raw_crop_rgb, kalman_crop_rgb
 
