@@ -32,7 +32,7 @@ graph LR
 Your project is built around two key algorithms: the **Kalman Filter** (for real-time tracking) and **CA-Jaccard** (for search optimization).
 
 ### A. Kalman Filter (Target Tracking)
-*Implemented under:* [src/Kalman_filter/](src/Kalman_filter) *(planned implementation location)*
+*Implemented under:* [src/kalman_filter/](../src/kalman_filter)
 
 A **Kalman Filter** is an mathematical algorithm used to estimate the "true state" of a moving object (its position and velocity) over time, even when the observations (from a person detector) are noisy or temporarily missing.
 
@@ -52,7 +52,7 @@ The filter runs in a continuous loop consisting of two phases:
 ---
 
 ### B. CA-Jaccard (Camera-Aware Jaccard Re-ranking)
-*Implemented in:* [rerank.py](src/caj/utils/rerank.py) and [caj_rerank.py](src/caj/utils/caj_rerank.py)
+*Implemented in:* [rerank.py](../src/caj/utils/rerank.py) and [caj_rerank.py](../src/caj/utils/caj_rerank.py)
 
 #### 1. What is Re-ranking?
 When you extract features from a query and gallery, you compute their initial distance (Cosine/Euclidean similarity). However, visual appearance alone is often insufficient. **Re-ranking** is a post-processing step that analyzes the neighborhood relationships. 
@@ -81,12 +81,15 @@ The project leverages several Python libraries to handle deep learning, data pro
 
 | Library | Role in Project | Where it is used |
 | :--- | :--- | :--- |
-| **PyTorch (`torch`)** | Deep learning framework. Used to load pre-trained CNNs, extract features, and train the Re-ID model. | [train_caj.py](scripts/train_caj.py), `src/caj/models/` |
-| **Gradio** | Web UI framework. Creates the interactive tabs, video views, and buttons for your demo application. | Planned in [app_design.md](app_design.md) |
-| **OpenCV (`opencv-python`)** | Image & Video processing. Reads webcam frames, draws the raw (**Red**) and tracked (**Green**) bounding boxes, and crops query images. | Bounding box rendering & frame capture in UI |
-| **Scikit-learn (`sklearn`)** | Machine Learning algorithms. Provides the **DBSCAN** clustering algorithm used to group similar features together during training. | [train_caj.py](scripts/train_caj.py#L12) |
-| **YACS** | Configuration management. Used by the Bag-of-Tricks (BoT) baseline to load YAML configurations cleanly. | `src/thirdparty/bot/` |
-| **NumPy / SciPy** | Scientific computing. Performs vector math, calculates distance matrices, and sorts rankings. | [rerank.py](src/caj/utils/rerank.py) |
+| **PyTorch (`torch`)** | Deep learning framework. Used to load pre-trained CNNs, extract features, and train the Re-ID model. | [train_caj.py](../scripts/train_caj.py), [src/caj/models/](../src/caj/models/) |
+| **Gradio** | Web UI framework. Creates the interactive tabs, video views, and buttons for your demo application. | [demo.py](../scripts/demo.py) |
+| **OpenCV (`opencv-python`)** | Image & Video processing. Reads webcam frames, draws the raw (**Red**) and tracked (**Green**) bounding boxes, and crops query images. | [webcam_handler.py](../src/app/webcam_handler.py) |
+| **Scikit-learn (`sklearn`)** | Machine Learning algorithms. Provides the **DBSCAN** clustering algorithm used to group similar features together during training. | [train_caj.py](../scripts/train_caj.py#L12) |
+| **YACS** | Configuration management. Used by the Bag-of-Tricks (BoT) baseline to load YAML configurations cleanly. | [thirdparty/bot/](../thirdparty/bot/) |
+| **NumPy / SciPy** | Scientific computing. Performs vector math, calculates distance matrices, and sorts rankings. | [rerank.py](../src/caj/utils/rerank.py) |
+
+> [!NOTE]
+> For a detailed code analysis and library usage walkthrough, see the [Source Code Deep-Dive Guide](code_deep_dive.md).
 
 ---
 
@@ -95,29 +98,31 @@ The project leverages several Python libraries to handle deep learning, data pro
 Here is an architectural map of your repository. 
 
 *   `in-allies-eyes/` (Root)
-    *   [README.md](README.md) - Project setup, installation steps, and commands for experiments.
-    *   [app_design.md](app_design.md) - The design specifications for your upcoming Gradio demo application.
-    *   [requirements.txt](requirements.txt) - Python package dependencies.
-    *   [scripts/](scripts) (Execution Scripts)
-        *   [download_datasets.py](scripts/download_datasets.py) - Automates downloads of Market1501 and GRID datasets.
-        *   [download_pretrained_models.py](scripts/download_pretrained_models.py) - Fetches ResNet50 backbone weights and trained checkpoints.
-        *   [train_caj.py](scripts/train_caj.py) - Training loop for CA-Jaccard model using ClusterMemory.
-        *   [test.py](scripts/test.py) - Evaluation script to measure model performance (mAP, Rank-1).
-        *   [run_tab3_ablation.py](scripts/run_tab3_ablation.py) - Runs ablation experiments (reproducing Table 3 from the reference paper).
-        *   [run_fig4_params.py](scripts/run_fig4_params.py) - Runs hyperparameter sweeps for clustering.
-        *   [plot_experiments.py](scripts/plot_experiments.py) - Generates figures and result tables from experimental logs.
-    *   [src/](src) (Core Library Logic)
-        *   [base/](base) - Base structures and abstract dataset classes.
-        *   [dataset/](dataset) - Datasets file management loaders.
-        *   [Kalman_filter/](Kalman_filter) - Target location for your Kalman filter tracking implementation.
-        *   [test/](test) - Evaluation-specific helper data loaders.
-        *   [utils/](utils) - Generic project-level utilities.
-        *   [thirdparty/bot/](thirdparty/bot) - Sub-repository containing the **Bag-of-Tricks (BoT)** Re-ID baseline.
-        *   [caj/](caj) (Camera-Aware Jaccard Model Library)
-            *   [datasets/](datasets) - Specialized dataset parsers (GRID, Market1501, MSMT17).
-            *   [models/](models) - Model structures (ResNet backbone, ClusterMemory module).
-            *   [evaluation_metrics/](evaluation_metrics) - Code for calculating CMC curves and mAP.
-            *   [utils/](utils) - CA-Jaccard mathematical engines ([rerank.py](rerank.py) and [caj_rerank.py](caj_rerank.py)).
+    *   [README.md](../README.md) - Project setup, installation steps, and commands for experiments.
+    *   [requirements.txt](../requirements.txt) - Python package dependencies.
+    *   [thirdparty/bot/](../thirdparty/bot/) - Sub-repository containing the **Bag-of-Tricks (BoT)** Re-ID baseline model structures.
+    *   [pretrained_models/](../pretrained_models/) - Folder for holding loaded/trained Re-ID model weights.
+    *   [data/](../data/) - Target folder for holding Market1501 and CUHK03 raw datasets.
+    *   [scripts/](../scripts) (Execution Scripts)
+        *   [demo.py](../scripts/demo.py) - Interactive Gradio demo app incorporating webcam/tracking and gallery search.
+        *   [download_datasets.py](../scripts/download_datasets.py) - Automates downloads of Market1501 and GRID datasets.
+        *   [download_pretrained_models.py](../scripts/download_pretrained_models.py) - Fetches ResNet50 backbone weights and trained checkpoints.
+        *   [train_caj.py](../scripts/train_caj.py) - Training loop for CA-Jaccard model using ClusterMemory.
+        *   [test.py](../scripts/test.py) - Evaluation script to measure model performance (mAP, Rank-1).
+        *   [run_tab3_ablation.py](../scripts/run_tab3_ablation.py) - Runs ablation experiments (reproducing Table 3 from the reference paper).
+        *   [run_fig4_params.py](../scripts/run_fig4_params.py) - Runs hyperparameter sweeps for clustering.
+        *   [plot_experiments.py](../scripts/plot_experiments.py) - Generates figures and result tables from experimental logs.
+    *   [src/](../src) (Core Library Logic)
+        *   [app/](../src/app) - Helper modules for the Gradio demo application:
+            *   [webcam_handler.py](../src/app/webcam_handler.py) - Handles webcam video capture, Haar cascade detector, and target crop extraction.
+            *   [gallery_search.py](../src/app/gallery_search.py) - Orchestrates query processing, gallery search, and CA-Jaccard re-ranking.
+            *   [reid_engine.py](../src/app/reid_engine.py) - Manages lazy-loading and inference of deep learning Re-ID models.
+        *   [kalman_filter/](../src/kalman_filter) - Kalman filter tracking implementation (`tracker.py`) used to smooth noisy bounding boxes.
+        *   [caj/](../src/caj) (Camera-Aware Jaccard Model Library)
+            *   [datasets/](../src/caj/datasets) - Specialized dataset parsers (GRID, Market1501, MSMT17).
+            *   [models/](../src/caj/models) - Model structures (ResNet backbone, ClusterMemory module).
+            *   [evaluation_metrics/](../src/caj/evaluation_metrics) - Code for calculating CMC curves and mAP.
+            *   [utils/](../src/caj/utils) - CA-Jaccard mathematical engines ([rerank.py](../src/caj/utils/rerank.py) and [caj_rerank.py](../src/caj/utils/caj_rerank.py)).
 
 ---
 
@@ -149,20 +154,20 @@ flowchart TD
     Plot -->|Generates plots & tables in| Figures[results/figures/]
 ```
 
-### Workflow B: The Planned Demo Application
-This flow illustrates how the components described in [app_design.md](app_design.md) will interact at runtime.
+### Workflow B: The Gradio Demo Application
+This flow illustrates how the components in the demo application interact at runtime.
 
 ```mermaid
 flowchart TD
-    Webcam[Webcam Video Frame] -->|Processed by OpenCV| Detector[Object Detector]
-    Detector -->|Provides raw box| KF[src/Kalman_filter/]
+    Webcam[Webcam Video Frame] -->|Processed by OpenCV in webcam_handler.py| Detector[Object Detector]
+    Detector -->|Provides raw box| KF[src/kalman_filter/tracker.py]
     
     KF -->|If Enabled: outputs smoothed box| SmoothedCrop[Crop Smoothed Query]
     Detector -->|If Disabled: outputs detector box| RawCrop[Crop Raw Query]
     
-    SmoothedCrop & RawCrop -->|Fed into model to extract vector| BoT[src/thirdparty/bot/modeling/baseline.py]
+    SmoothedCrop & RawCrop -->|Fed into model to extract vector in reid_engine.py| BoT[src/thirdparty/bot/modeling/baseline.py]
     
-    BoT -->|Outputs Feature Vector| Search[Gallery Database Search]
+    BoT -->|Outputs Feature Vector| Search[Gallery Database Search in gallery_search.py]
     
     Search -->|Computes Initial Distances| DistMat[Distance Matrix]
     
@@ -170,7 +175,7 @@ flowchart TD
     DistMat -->|If CA-Jaccard Disabled: Returns baseline| RankedList[Ranked List of Matches]
     Rerank --> RankedList
     
-    RankedList -->|Displayed on| GradioUI[Gradio Demo Web Application]
+    RankedList -->|Displayed on| GradioUI[scripts/demo.py]
 ```
 
 ---
@@ -182,14 +187,15 @@ As a Software Engineering student, you can appreciate the architectural decision
 1. **Separation of Concerns (SoC):** 
    The business/algorithmic logic lives strictly inside the `src/` folder. The `scripts/` folder only contains execution wrapper files. This ensures that you can reuse your core algorithms (like `caj`) in multiple different applications (like a CLI script or a Gradio web app) without rewriting code.
 2. **Adapter Pattern (Integration of Third-Party Code):**
-   The project integrates a baseline model from a separate framework (Bag-of-Tricks under `src/thirdparty/bot/`). To make this third-party model compatible with the testing scripts of the CA-Jaccard framework, the project uses the [convert_bot_state_dict](scripts/test.py#L43) adapter function in `scripts/test.py` to translate model weights between formats dynamically.
+   The project integrates a baseline model from a separate framework (Bag-of-Tricks under `src/thirdparty/bot/`). To make this third-party model compatible with the testing scripts of the CA-Jaccard framework, the project uses the [convert_bot_state_dict](../scripts/test.py#L43) adapter function in `../scripts/test.py` to translate model weights between formats dynamically.
 3. **Parametrization & Clean Configurations:**
-   Rather than hardcoding parameters like learning rates, number of epochs, or camera parameters, the project stores them in `.yml` files (under `src/thirdparty/bot/configs/`) or loads them from centralized files like [experiment_utils.py](scripts/experiment_utils.py). This makes experiments reproducible and easy to configure.
+   Rather than hardcoding parameters like learning rates, number of epochs, or camera parameters, the project stores them in `.yml` files (under `src/thirdparty/bot/configs/`) or loads them from centralized files like [experiment_utils.py](../scripts/experiment_utils.py). This makes experiments reproducible and easy to configure.
 
 ---
 
-## 7. Next Steps for Implementation
+## 7. Future Extension Ideas
 
-To complete the demo application proposed in [app_design.md](app_design.md), your primary software engineering tasks will be:
-1. Implement the Kalman Filter state equations (predict, update, initialization) inside [src/Kalman_filter/](src/Kalman_filter).
-2. Write a main Gradio application script (e.g., `app.py` in the root folder) that imports the tracking code, model loaders, and CA-Jaccard re-ranking modules to create the graphical user interface.
+Now that the core tracking and Re-ID search pipelines are fully implemented and integrated into the Gradio interface, here are some excellent software engineering extensions you could explore next:
+1. **Real-time Bounding Box Association**: Upgrade the single-person Haar cascade face tracker to multi-target tracking (e.g., integrating IoU association or Hungarian matching with Kalman prediction).
+2. **Dynamic Gallery Caching**: Optimize gallery indexing by running feature extraction asynchronously or caching embeddings using a lightweight database (like SQLite or Faiss indices).
+3. **Advanced Visualizations**: Embed real-time distance metrics and top-K query confidence scores directly onto the Gradio matches gallery.
